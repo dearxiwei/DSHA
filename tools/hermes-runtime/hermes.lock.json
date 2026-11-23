@@ -67,7 +67,8 @@
     "node_modules/.cache",
     "**/node_modules/.cache",
     "hermes_cli/.web_dist-build-*",
-    "**/*.map"
+    "**/*.map",
+    "apps"
   ],
   "forbiddenAbsolutePathFragments": [
     "__BUILD_STAGE__"

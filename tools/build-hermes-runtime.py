@@ -372,7 +372,7 @@ def pack(stage: Path, output: Path, layout: dict) -> dict:
         raise SystemExit("STAGE_INCOMPLETE：缺少 hermes.sh")
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(output.suffix + ".tmp")
-    binaries, count, size = [], 0, 0
+    binaries, foreign, count, size = [], [], 0, 0
     try:
         with temporary.open("wb") as raw, gzip.GzipFile(
                 fileobj=raw, mode="wb", filename="", mtime=0, compresslevel=9) as compressed:
@@ -400,8 +400,14 @@ def pack(stage: Path, output: Path, layout: dict) -> dict:
                     executable = header.startswith((b"#!", b"\x7fELF"))
                     if header[:4] == b"\x7fELF":
                         if len(header) < 20 or int.from_bytes(header[18:20], "little") != ELF_ARM64:
-                            raise SystemExit(f"NON_ARM64_ELF：{relative}")
-                        binaries.append(relative)
+                            # node_modules 里会带各平台预编译件（如 arm-gnueabihf），
+                            # 运行期只会按平台挑选，不参与加载；记录但不阻断。
+                            if "/node_modules/" in "/" + relative:
+                                foreign.append(relative)
+                            else:
+                                raise SystemExit(f"NON_ARM64_ELF：{relative}")
+                        else:
+                            binaries.append(relative)
                     item = tarfile.TarInfo(name)
                     item.size = path.stat().st_size
                     item.mode = 0o755 if executable else 0o644
@@ -422,7 +428,8 @@ def pack(stage: Path, output: Path, layout: dict) -> dict:
         temporary.unlink(missing_ok=True)
     return {"files": count, "unpacked_bytes": size,
             "archive_bytes": output.stat().st_size,
-            "sha256": sha256_file(output), "arm64_binaries": len(binaries)}
+            "sha256": sha256_file(output), "arm64_binaries": len(binaries),
+            "foreign_binaries": foreign[:50]}
 
 
 def write_inputs(output: Path, lock: dict, components: dict, summary: dict) -> Path:
