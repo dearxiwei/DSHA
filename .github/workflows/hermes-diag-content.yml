@@ -1,0 +1,111 @@
+# 临时诊断（用完即删）：内容与 hermes-runtime.yml 相同，只把触发改成 push。
+name: hermes-diag-content
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hermes-diag-content.yml'
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # 必须 arm64 且 glibc 与目标 rootfs 同代（Ubuntu 24.04）
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 校验锁文件完整性
+        run: python3 tools/build-hermes-runtime.py --check-lock
+
+      - name: 导出锁文件版本到环境
+        run: |
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          lock = json.load(open("tools/hermes-runtime/hermes.lock.json", encoding="utf-8"))
+          print("UV_VERSION=" + lock["buildTools"]["uv"])
+          print("PNPM_VERSION=" + lock["buildTools"]["pnpm"])
+          print("HERMES_COMMIT=" + lock["hermes"]["commit"])
+          PY
+
+      - name: 安装构建工具（固定版本）
+        run: |
+          python3 -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
+          sudo corepack enable
+          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+          node --version
+          pnpm --version
+          uv --version
+
+      - name: 组装运行时包
+        run: |
+          python3 tools/build-hermes-runtime.py \
+            --output app/src/main/assets/hermes-runtime.bin \
+            --stage app/build/hermes-runtime
+
+      - name: 冒烟：解包到 /opt/hermes 并启动 dashboard
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /opt
+          sudo ln -sfn "$PWD/app/build/hermes-runtime/opt/hermes" /opt/hermes
+          HERMES_HOME="$RUNNER_TEMP/hermes-home" \
+            /opt/hermes/hermes.sh dashboard --no-open --host 127.0.0.1 --port 19119 \
+            > "$RUNNER_TEMP/dashboard.log" 2>&1 &
+          PID=$!
+          ok=0
+          for _ in $(seq 1 120); do
+            if curl -fsS "http://127.0.0.1:19119/api/status" -o "$RUNNER_TEMP/status.json"; then ok=1; break; fi
+            sleep 1
+            kill -0 $PID 2>/dev/null || break
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::error::dashboard 未在 120 秒内就绪"
+            tail -n 80 "$RUNNER_TEMP/dashboard.log" || true
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, os
+          status = json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "status.json"), encoding="utf-8"))
+          assert status.get("auth_required") in (False, None), status.get("auth_required")
+          print("auth_required:", status.get("auth_required"))
+          PY
+          # U2 验证：预构建 web_dist 生效时不应触发前端构建
+          if grep -qiE 'pnpm|vite build|building frontend' "$RUNNER_TEMP/dashboard.log"; then
+            echo "::error::启动过程触发了前端构建，说明 HERMES_WEB_DIST 未被采用"
+            tail -n 80 "$RUNNER_TEMP/dashboard.log"
+            exit 1
+          fi
+          kill $PID 2>/dev/null || true
+          wait $PID 2>/dev/null || true
+
+      - name: 校验产物身份
+        run: |
+          python3 - <<'PY'
+          import json, hashlib, pathlib
+          archive = pathlib.Path("app/src/main/assets/hermes-runtime.bin")
+          inputs = json.loads(archive.with_suffix(".inputs.json").read_text(encoding="utf-8"))
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          assert digest == inputs["archive_sha256"], "归档摘要与 inputs.json 不一致"
+          print(json.dumps({k: inputs[k] for k in ("version", "hermesCommit", "files",
+                                                   "unpacked_bytes", "archive_bytes")}, indent=2))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hermes-runtime-${{ github.run_id }}
+          path: |
+            app/src/main/assets/hermes-runtime.bin
+            app/src/main/assets/hermes-runtime.inputs.json
+          retention-days: 14
+
+      - name: 发布到 Release（可选）
+        if: ${{ inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          test -n "$TAG" || { echo "::error::release_tag 为空"; exit 1; }
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "hermes-runtime $TAG" --notes "Hermes 运行时固定输入（由 CI 构建）"
+          gh release upload "$TAG" app/src/main/assets/hermes-runtime.bin app/src/main/assets/hermes-runtime.inputs.json --clobber
