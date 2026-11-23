@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: 校验锁文件完整性
         run: python3 tools/build-hermes-runtime.py --check-lock
@@ -101,7 +101,7 @@ jobs:
                                                    "unpacked_bytes", "archive_bytes")}, indent=2))
           PY
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hermes-runtime-${{ github.run_id }}
           path: |
