@@ -1,13 +1,16 @@
-# 草稿（M1A）：只在手动 dispatch 时运行，不随 push 触发。
-# 目标：在 arm64 runner 上产出 app/src/main/assets/hermes-runtime.bin 并冒烟。
-# 前置：仓库 Settings → Actions 已启用；锁文件里的 commit/摘要已补全。
+# 状态：草稿（M1A）。仅手动 dispatch 触发，不随 push 运行。
+# 目标：在 arm64 runner 上产出 hermes-runtime.bin 并冒烟。
+#
+# 重要约束：本仓库 Actions 策略为 allowed_actions=local_only，
+# 因此本 workflow 不能使用 actions/checkout、actions/upload-artifact 等官方 action，
+# 取源码与上传产物都必须用普通命令完成，否则会在 startup 阶段直接失败。
 name: hermes-runtime
 
 on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: "把产物上传到本仓库 Release（需 contents: write）"
+        description: "把产物上传到本仓库 Release（需要 contents: write）"
         type: boolean
         default: false
       release_tag:
@@ -16,7 +19,7 @@ on:
         default: ""
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -24,7 +27,13 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 取源码（不使用官方 action）
+        run: |
+          set -euo pipefail
+          curl -fsSL "${{ github.server_url }}/${{ github.repository }}/archive/${{ github.sha }}.tar.gz" \
+            | tar -xz --strip-components=1
+          test -f tools/build-hermes-runtime.py
+          test -f tools/hermes-runtime/hermes.lock.json
 
       - name: 校验锁文件完整性
         run: python3 tools/build-hermes-runtime.py --check-lock
@@ -41,6 +50,7 @@ jobs:
 
       - name: 安装构建工具（固定版本）
         run: |
+          set -euo pipefail
           python3 -m pip install --disable-pip-version-check "uv==${UV_VERSION}"
           sudo corepack enable
           corepack prepare "pnpm@${PNPM_VERSION}" --activate
@@ -50,6 +60,7 @@ jobs:
 
       - name: 组装运行时包
         run: |
+          set -euo pipefail
           python3 tools/build-hermes-runtime.py \
             --output app/src/main/assets/hermes-runtime.bin \
             --stage app/build/hermes-runtime
@@ -92,7 +103,7 @@ jobs:
       - name: 校验产物身份
         run: |
           python3 - <<'PY'
-          import json, hashlib, pathlib
+          import hashlib, json, pathlib
           archive = pathlib.Path("app/src/main/assets/hermes-runtime.bin")
           inputs = json.loads(archive.with_suffix(".inputs.json").read_text(encoding="utf-8"))
           digest = hashlib.sha256(archive.read_bytes()).hexdigest()
@@ -101,13 +112,15 @@ jobs:
                                                    "unpacked_bytes", "archive_bytes")}, indent=2))
           PY
 
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: hermes-runtime-${{ github.run_id }}
-          path: |
-            app/src/main/assets/hermes-runtime.bin
-            app/src/main/assets/hermes-runtime.inputs.json
-          retention-days: 14
+      - name: 写入运行摘要
+        run: |
+          {
+            echo "### hermes-runtime 产物身份"
+            echo '```json'
+            cat app/src/main/assets/hermes-runtime.inputs.json
+            echo '```'
+            ls -l app/src/main/assets/hermes-runtime.bin
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 发布到 Release（可选）
         if: ${{ inputs.publish_release }}
@@ -117,5 +130,8 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$TAG" || { echo "::error::release_tag 为空"; exit 1; }
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "hermes-runtime $TAG" --notes "Hermes 运行时固定输入（由 CI 构建）"
-          gh release upload "$TAG" app/src/main/assets/hermes-runtime.bin app/src/main/assets/hermes-runtime.inputs.json --clobber
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --title "hermes-runtime $TAG" --notes "Hermes 运行时固定输入（由 CI 构建）"
+          gh release upload "$TAG" \
+            app/src/main/assets/hermes-runtime.bin \
+            app/src/main/assets/hermes-runtime.inputs.json --clobber
