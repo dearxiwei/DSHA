@@ -293,6 +293,18 @@ def stage_runtime(lock: dict, stage: Path, cache: Path, skip_verify: bool) -> di
         pnpm.chmod(0o755)
     command = lock["webDist"]["command"].replace("pnpm ", f"{pnpm} ", 1)
     run(["sh", "-c", command], cwd=app / lock["webDist"]["cwd"], env=env)
+
+    tui = lock.get("tuiDist") or {}
+    if tui:
+        run([str(root / "node/bin/node"), tui["buildCommand"].split()[1],
+             *tui["buildCommand"].split()[2:]], cwd=app, env=env)
+        built = app / tui["builtDir"]
+        if not (built / "entry.js").is_file():
+            raise SystemExit(f"TUI_DIST_MISSING：{built}/entry.js 不存在")
+        target = app / tui["publishTo"]
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(built, target)
     web_dist = app / lock["webDist"]["cwd"] / lock["webDist"]["output"]
     if not (web_dist / "index.html").is_file():
         raise SystemExit(f"WEB_DIST_MISSING：{web_dist} 下没有 index.html")

@@ -66,6 +66,7 @@ jobs:
           set -euo pipefail
           sudo mkdir -p /opt
           sudo ln -sfn "$PWD/app/build/hermes-runtime/opt/hermes" /opt/hermes
+          test -f /opt/hermes/app/hermes_cli/tui_dist/entry.js || { echo "::error::缺少 TUI bundle，Chat 页会不可用"; exit 1; }
           HERMES_HOME="$RUNNER_TEMP/hermes-home" \
             /opt/hermes/hermes.sh dashboard --no-open --host 127.0.0.1 --port 19119 \
             > "$RUNNER_TEMP/dashboard.log" 2>&1 &

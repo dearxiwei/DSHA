@@ -68,9 +68,17 @@
     "**/node_modules/.cache",
     "hermes_cli/.web_dist-build-*",
     "**/*.map",
-    "apps"
+    "apps",
+    "node_modules",
+    "**/node_modules"
   ],
   "forbiddenAbsolutePathFragments": [
     "__BUILD_STAGE__"
-  ]
+  ],
+  "tuiDist": {
+    "_comment": "Chat 页会起 hermes --tui；wheel 布局下入口是 hermes_cli/tui_dist/entry.js。",
+    "buildCommand": "node scripts/build/tui.mjs",
+    "builtDir": "ui-tui/dist",
+    "publishTo": "hermes_cli/tui_dist"
+  }
 }
