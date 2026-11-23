@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "runtime": "hermes",
+  "status": "draft",
+  "notes": [
+    "空字符串表示尚未固定：tools/build-hermes-runtime.py 会拒绝构建并打印待补项。",
+    "补摘要：python3 tools/build-hermes-runtime.py --print-digests",
+    "换版本只改本文件；改完必须重新生成 assets/hermes-runtime.bin 与描述符。"
+  ],
+  "hermes": {
+    "repository": "https://github.com/NousResearch/hermes-agent",
+    "commit": "8c0fe7fe9af01ffbbdc718bc8e30e76e9a6e7316",
+    "commitDate": "2026-11-23",
+    "archiveUrl": "https://codeload.github.com/NousResearch/hermes-agent/tar.gz/8c0fe7fe9af01ffbbdc718bc8e30e76e9a6e7316",
+    "archiveSha256": "89d561b1f511736d57b2d3a817379ab969e678c6fadb896c3444839721fb9db3",
+    "versionFile": "hermes_cli/__init__.py"
+  },
+  "python": {
+    "version": "3.14.10",
+    "release": "20261110",
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.14.10%2B20261110-aarch64-unknown-linux-gnu-install_only.tar.gz",
+    "sha256": "e59f83159984a55e719bb3805a0b2b5b281f645769222218084b78b92eedc07f",
+    "stripComponents": 0
+  },
+  "node": {
+    "version": "24.22.3",
+    "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-arm64.tar.xz",
+    "sha256": "6e51a2ada00f0011cc266f65d98922b403d74588f809ca2aa615a5fe1ce6e86c",
+    "stripComponents": 1
+  },
+  "buildTools": {
+    "_comment": "仅 CI 使用，不进运行时包；版本必须固定，禁止用 latest。",
+    "uv": "0.13.9",
+    "pnpm": "12.23.0"
+  },
+  "webDist": {
+    "_comment": "cwd 为 hermes 源码内 pnpm 工作区根；output 为相对 cwd 的产物目录（由 scripts/build/web.mjs 决定）。",
+    "cwd": ".",
+    "output": "hermes_cli/web_dist",
+    "command": "pnpm install --frozen-lockfile && node scripts/build/web.mjs"
+  },
+  "layout": {
+    "root": "opt/hermes",
+    "binLink": "usr/local/bin/hermes",
+    "webDistEnv": "/opt/hermes/web_dist",
+    "entryModule": "hermes_cli.main",
+    "entryArgs": [
+      "dashboard",
+      "--no-open",
+      "--host",
+      "127.0.0.1"
+    ]
+  },
+  "excludes": [
+    ".git",
+    ".github",
+    "nix",
+    "docker",
+    "tests",
+    "tests-js",
+    "website",
+    "contributors",
+    "evals",
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/.pytest_cache",
+    "**/node_modules/.cache"
+  ],
+  "forbiddenAbsolutePathFragments": [
+    "__BUILD_STAGE__"
+  ]
+}
