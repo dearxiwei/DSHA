@@ -427,6 +427,10 @@ def main() -> int:
     args = parser.parse_args()
 
     lock = load_lock()
+    # 统一绝对路径：打包与构建命令里出现相对路径会在切换 cwd 后失效。
+    args.stage = args.stage.resolve()
+    args.cache = args.cache.resolve()
+    args.output = args.output.resolve()
     if args.check_lock:
         missing = missing_fields(lock)
         print("锁文件完整" if not missing else "\n".join(f"缺少 {k}（{v}）" for k, v in missing))
