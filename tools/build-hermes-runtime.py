@@ -264,10 +264,19 @@ def stage_runtime(lock: dict, stage: Path, cache: Path, skip_verify: bool) -> di
     # 否则 npm 会装到 runner 自己的全局前缀里，随包 PATH 上找不到 pnpm。
     run([str(root / "node/bin/npm"), "install", "-g",
          f"pnpm@{lock['buildTools']['pnpm']}", "--prefix", str(root / "node"),
-         "--no-fund", "--no-audit"], env=env)
-    if not (root / "node/bin/pnpm").is_file():
-        raise SystemExit("PNPM_INSTALL_FAILED：随包 node 前缀下没有 bin/pnpm")
-    run(["sh", "-c", lock["webDist"]["command"]], cwd=app / lock["webDist"]["cwd"], env=env)
+         "--no-fund", "--no-audit", "--allow-scripts=pnpm"], env=env)
+    pnpm = root / "node/bin/pnpm"
+    if not pnpm.exists():
+        # npm 没建 bin 软链时，用随包 node 直接调 pnpm 的入口（路径保持相对，避免泄漏构建目录）。
+        entry = root / "node/lib/node_modules/pnpm/bin/pnpm.cjs"
+        if not entry.is_file():
+            raise SystemExit("PNPM_INSTALL_FAILED：既没有 bin/pnpm，也没有 pnpm.cjs")
+        pnpm.write_text('#!/bin/sh\nexec "$(dirname "$0")/node" '
+                        '"$(dirname "$0")/../lib/node_modules/pnpm/bin/pnpm.cjs" "$@"\n',
+                        encoding="utf-8")
+        pnpm.chmod(0o755)
+    command = lock["webDist"]["command"].replace("pnpm ", f"{pnpm} ", 1)
+    run(["sh", "-c", command], cwd=app / lock["webDist"]["cwd"], env=env)
     web_dist = app / lock["webDist"]["cwd"] / lock["webDist"]["output"]
     if not (web_dist / "index.html").is_file():
         raise SystemExit(f"WEB_DIST_MISSING：{web_dist} 下没有 index.html")
