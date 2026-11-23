@@ -260,9 +260,13 @@ def stage_runtime(lock: dict, stage: Path, cache: Path, skip_verify: bool) -> di
 
     env = {"PATH": f"{root / 'node/bin'}:{os.environ.get('PATH', '')}",
            "HERMES_WEB_DIST": str(root / "web_dist")}
-    # 前端 engines 要求 node>=26；pnpm 装进随包 node 前缀，避免落到 runner 的系统 node。
+    # 前端 engines 要求 node>=26；pnpm 必须装进随包 node 前缀（--prefix），
+    # 否则 npm 会装到 runner 自己的全局前缀里，随包 PATH 上找不到 pnpm。
     run([str(root / "node/bin/npm"), "install", "-g",
-         f"pnpm@{lock['buildTools']['pnpm']}", "--no-fund", "--no-audit"], env=env)
+         f"pnpm@{lock['buildTools']['pnpm']}", "--prefix", str(root / "node"),
+         "--no-fund", "--no-audit"], env=env)
+    if not (root / "node/bin/pnpm").is_file():
+        raise SystemExit("PNPM_INSTALL_FAILED：随包 node 前缀下没有 bin/pnpm")
     run(["sh", "-c", lock["webDist"]["command"]], cwd=app / lock["webDist"]["cwd"], env=env)
     web_dist = app / lock["webDist"]["cwd"] / lock["webDist"]["output"]
     if not (web_dist / "index.html").is_file():
