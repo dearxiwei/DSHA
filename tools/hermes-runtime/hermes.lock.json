@@ -29,12 +29,12 @@
     "stripComponents": 1
   },
   "buildTools": {
-    "_comment": "uv 由 CI 用 pip 装；pnpm 在 builder 里装进随包 node 前缀（前端 engines 要求 node>=26）。",
+    "_comment": "uv 由 CI 用 pip 装；pnpm 版本以 hermes pm/lock.json 为准（此处为记录值，builder 运行时仍会读取仓库值）。",
     "uv": "0.13.9",
-    "pnpm": "12.23.0"
+    "pnpm": "12.15.0"
   },
   "webDist": {
-    "_comment": "cwd 为 hermes 源码内 pnpm 工作区根；output 为相对 cwd 的产物目录（由 scripts/build/web.mjs 决定）。",
+    "_comment": "cwd 为 pnpm 工作区根；output 由 scripts/build/web.mjs 决定（hermes_cli/web_dist）。",
     "cwd": ".",
     "output": "hermes_cli/web_dist",
     "command": "pnpm install --frozen-lockfile && node scripts/build/web.mjs"

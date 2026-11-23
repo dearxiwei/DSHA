@@ -178,6 +178,19 @@ def tree_digest(root: Path, excludes: list[str]) -> dict:
     return {"sha256": digest.hexdigest(), "files": files, "bytes": total}
 
 
+def repo_pnpm_version(app: Path) -> str:
+    """Hermes 用 pm/lock.json 钉死 pnpm 版本，仓库 preinstall 会逐字符核对。"""
+    lock_file = app / "pm/lock.json"
+    if not lock_file.is_file():
+        return ""
+    try:
+        data = json.loads(lock_file.read_text(encoding="utf-8"))
+        version = data.get("packages", {}).get("pnpm", {}).get("version", "")
+        return version if isinstance(version, str) else ""
+    except (ValueError, OSError):
+        return ""
+
+
 def uv_overrides(pyproject: Path) -> list[str]:
     """读取 [tool.uv].override-dependencies；安装阶段必须与导出阶段用同一组，
     否则 uv pip 会按底层包元数据判定冲突（例如 browser-harness 钉 pillow 12.3.0）。"""
@@ -260,10 +273,13 @@ def stage_runtime(lock: dict, stage: Path, cache: Path, skip_verify: bool) -> di
 
     env = {"PATH": f"{root / 'node/bin'}:{os.environ.get('PATH', '')}",
            "HERMES_WEB_DIST": str(root / "web_dist")}
-    # 前端 engines 要求 node>=26；pnpm 必须装进随包 node 前缀（--prefix），
-    # 否则 npm 会装到 runner 自己的全局前缀里，随包 PATH 上找不到 pnpm。
+    # 前端 engines 要求 node>=26；pnpm 版本由 hermes 自己的 pm/lock.json 钉死，
+    # 仓库 preinstall 会逐字符核对，必须用它指定的版本而不是我们猜的版本。
+    pnpm_version = repo_pnpm_version(app) or lock["buildTools"]["pnpm"]
+    print(f"pnpm 版本取自 hermes pm/lock.json：{pnpm_version}", file=sys.stderr)
+    # pnpm 必须装进随包 node 前缀（--prefix），否则会落到 runner 的全局前缀里。
     run([str(root / "node/bin/npm"), "install", "-g",
-         f"pnpm@{lock['buildTools']['pnpm']}", "--prefix", str(root / "node"),
+         f"pnpm@{pnpm_version}", "--prefix", str(root / "node"),
          "--no-fund", "--no-audit", "--allow-scripts=pnpm"], env=env)
     pnpm = root / "node/bin/pnpm"
     if not pnpm.exists():
