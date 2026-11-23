@@ -260,7 +260,10 @@ def stage_runtime(lock: dict, stage: Path, cache: Path, skip_verify: bool) -> di
 
     env = {"PATH": f"{root / 'node/bin'}:{os.environ.get('PATH', '')}",
            "HERMES_WEB_DIST": str(root / "web_dist")}
-    run(["sh", "-lc", lock["webDist"]["command"]], cwd=app / lock["webDist"]["cwd"], env=env)
+    # 前端 engines 要求 node>=26；pnpm 装进随包 node 前缀，避免落到 runner 的系统 node。
+    run([str(root / "node/bin/npm"), "install", "-g",
+         f"pnpm@{lock['buildTools']['pnpm']}", "--no-fund", "--no-audit"], env=env)
+    run(["sh", "-c", lock["webDist"]["command"]], cwd=app / lock["webDist"]["cwd"], env=env)
     web_dist = app / lock["webDist"]["cwd"] / lock["webDist"]["output"]
     if not (web_dist / "index.html").is_file():
         raise SystemExit(f"WEB_DIST_MISSING：{web_dist} 下没有 index.html")

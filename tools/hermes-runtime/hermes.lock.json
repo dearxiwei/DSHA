@@ -23,13 +23,13 @@
     "stripComponents": 0
   },
   "node": {
-    "version": "24.22.3",
-    "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-arm64.tar.xz",
-    "sha256": "6e51a2ada00f0011cc266f65d98922b403d7ad88f809ca2aa615a5fe1ce6e86c",
+    "version": "26.4.0",
+    "url": "https://nodejs.org/dist/v26.4.0/node-v26.4.0-linux-arm64.tar.xz",
+    "sha256": "f6d8eedc52170667d45730ac2f413c4aa1e7cd2165c9cac5746ef3cb0f4ec45a",
     "stripComponents": 1
   },
   "buildTools": {
-    "_comment": "仅 CI 使用，不进运行时包；版本必须固定，禁止用 latest。",
+    "_comment": "uv 由 CI 用 pip 装；pnpm 在 builder 里装进随包 node 前缀（前端 engines 要求 node>=26）。",
     "uv": "0.13.9",
     "pnpm": "12.23.0"
   },
