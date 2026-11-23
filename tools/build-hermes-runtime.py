@@ -315,6 +315,31 @@ def stage_runtime(lock: dict, stage: Path, cache: Path, skip_verify: bool) -> di
     return {"version": version, "app": app, "python": python_bin}
 
 
+def relocate_entry_scripts(stage: Path, layout: dict) -> list[str]:
+    """把 pbs python 自带 console script 的 shebang 改成运行期路径 /opt/hermes。
+
+    uv pip 安装的脚本会写成构建机的绝对路径，进包后必然失效；
+    我们只改文件首行的 #! 前缀，正文不动。
+    """
+    staged = str(stage).encode()
+    final = "/opt/hermes"
+    rewritten = []
+    bin_dir = stage / layout["root"] / "python/bin"
+    if not bin_dir.is_dir():
+        return rewritten
+    for path in sorted(bin_dir.iterdir()):
+        if path.is_symlink() or not path.is_file():
+            continue
+        data = path.read_bytes()
+        if not data.startswith(b"#!"):
+            continue
+        first, sep, rest = data.partition(b"\n")
+        if staged in first:
+            path.write_bytes(first.replace(staged, final.encode()) + sep + rest)
+            rewritten.append(path.name)
+    return rewritten
+
+
 def assert_no_build_paths(stage: Path) -> None:
     """只检查会随搬运失效的文件：入口目录、shebang 脚本与 Python 路径文件。
 
@@ -480,6 +505,9 @@ def main() -> int:
         return 0
 
     staged = stage_runtime(lock, args.stage, args.cache, args.skip_verify)
+    relocated = relocate_entry_scripts(args.stage, lock["layout"])
+    if relocated:
+        print(f"已重写 {len(relocated)} 个入口脚本 shebang", file=sys.stderr)
     assert_no_build_paths(args.stage)
     root = args.stage / lock["layout"]["root"]
     digests = {
