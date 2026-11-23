@@ -1,0 +1,20 @@
+# 临时诊断（用完即删）：判断 hermes-runtime 的 startup_failure 是 runner 标签还是配置问题。
+name: hermes-diag
+
+on:
+  push:
+    paths:
+      - '.github/workflows/hermes-diag.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  x86:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "x86 ok"; python3 --version
+  arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - run: echo "arm ok"; uname -m; python3 --version
