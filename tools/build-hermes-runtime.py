@@ -178,6 +178,18 @@ def tree_digest(root: Path, excludes: list[str]) -> dict:
     return {"sha256": digest.hexdigest(), "files": files, "bytes": total}
 
 
+def uv_overrides(pyproject: Path) -> list[str]:
+    """读取 [tool.uv].override-dependencies；安装阶段必须与导出阶段用同一组，
+    否则 uv pip 会按底层包元数据判定冲突（例如 browser-harness 钉 pillow 12.3.0）。"""
+    import tomllib
+
+    if not pyproject.is_file():
+        return []
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    values = data.get("tool", {}).get("uv", {}).get("override-dependencies", [])
+    return [str(item) for item in values if isinstance(item, str)]
+
+
 def hermes_version(app: Path, commit: str) -> str:
     """Hermes 的 __version__ 是运行时从 git describe 推导的，离线源码树里没有静态版本。
     因此身份以提交号为准（前 12 位），与 inputs.json 的 hermesCommit 互相印证。"""
@@ -233,9 +245,18 @@ def stage_runtime(lock: dict, stage: Path, cache: Path, skip_verify: bool) -> di
     requirements = cache / "requirements.txt"
     run(["uv", "export", "--frozen", "--no-dev", "--no-emit-project",
          "--project", str(app), "-o", str(requirements)])
+    # pyproject 里的 [tool.uv].override-dependencies 只对 uv 自己的解析器生效；
+    # uv export 会按 override 钉住版本，但安装时 uv pip 仍会因底层包元数据冲突而拒绝，
+    # 所以必须把同一组 override 显式传给 uv pip install。
+    overrides = uv_overrides(app / "pyproject.toml")
+    install = ["uv", "pip", "install", "--python", str(python_bin), "--no-cache",
+               "--requirements", str(requirements)]
+    if overrides:
+        override_file = cache / "uv-overrides.txt"
+        override_file.write_text("\n".join(overrides) + "\n", encoding="utf-8")
+        install += ["--override", str(override_file)]
     python_env = {"UV_PYTHON_DOWNLOADS": "never", "UV_CACHE_DIR": str(cache / "uv")}
-    run(["uv", "pip", "install", "--python", str(python_bin), "--no-cache",
-         "--requirements", str(requirements)], env=python_env)
+    run(install, env=python_env)
 
     env = {"PATH": f"{root / 'node/bin'}:{os.environ.get('PATH', '')}",
            "HERMES_WEB_DIST": str(root / "web_dist")}
