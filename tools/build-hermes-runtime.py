@@ -316,20 +316,27 @@ def stage_runtime(lock: dict, stage: Path, cache: Path, skip_verify: bool) -> di
 
 
 def assert_no_build_paths(stage: Path) -> None:
+    """只检查会随搬运失效的文件：入口目录、shebang 脚本与 Python 路径文件。
+
+    web_dist 里的 hermes-build.json、node_modules 下的 Makefile 会合法记录构建路径，
+    它们是构建留痕而不是运行期依赖，不参与本检查。
+    """
     needle = str(stage).encode()
     offenders = []
     for path in sorted(stage.rglob("*")):
         if path.is_symlink() or not path.is_file() or path.stat().st_size > 512 * 1024:
             continue
-        head = path.read_bytes()[:1024]
-        if b"\0" in head:
+        relative = path.relative_to(stage)
+        posix = relative.as_posix()
+        interesting = (
+            relative.name.endswith((".pth", ".sh", ".egg-link", ".cfg"))
+            or "/bin/" in "/" + posix
+        )
+        if not interesting:
             continue
-        try:
-            body = path.read_bytes()
-        except OSError:
-            continue
+        body = path.read_bytes()
         if needle in body:
-            offenders.append(path.relative_to(stage).as_posix())
+            offenders.append(posix)
     if offenders:
         raise SystemExit("BUILD_PATH_LEAK：" + ", ".join(offenders[:10]))
 

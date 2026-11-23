@@ -64,7 +64,10 @@
     "**/__pycache__",
     "**/*.pyc",
     "**/.pytest_cache",
-    "**/node_modules/.cache"
+    "node_modules/.cache",
+    "**/node_modules/.cache",
+    "hermes_cli/.web_dist-build-*",
+    "**/*.map"
   ],
   "forbiddenAbsolutePathFragments": [
     "__BUILD_STAGE__"
