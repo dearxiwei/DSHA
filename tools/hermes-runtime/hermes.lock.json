@@ -25,7 +25,7 @@
   "node": {
     "version": "24.22.3",
     "url": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-linux-arm64.tar.xz",
-    "sha256": "6e51a2ada00f0011cc266f65d98922b403d74588f809ca2aa615a5fe1ce6e86c",
+    "sha256": "6e51a2ada00f0011cc266f65d98922b403d7ad88f809ca2aa615a5fe1ce6e86c",
     "stripComponents": 1
   },
   "buildTools": {
