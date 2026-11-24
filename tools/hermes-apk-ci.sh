@@ -513,7 +513,12 @@ cmd_publish() {
     [ -n "${GH_TOKEN:-}" ] || fail "缺少 GH_TOKEN，无法上传 Release"
     [ -n "$apk" ] && [ -f "$apk" ] || fail "缺少 HERMES_APK（先运行 artifact 子命令）"
     short=$(printf '%s' "${GITHUB_SHA:-local}" | cut -c1-12)
-    name="hermes-apk-$short-standard-debug.apk"
+    # 变体从产物路径判断，避免把 release 包命名成 debug。
+    case "$apk" in
+        *-release.apk) variant=release ;;
+        *) variant=debug ;;
+    esac
+    name="hermes-apk-$short-standard-$variant.apk"
     out_dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/hermes-apk-release"
     mkdir -p "$out_dir"
     cp "$apk" "$out_dir/$name"
@@ -524,7 +529,7 @@ cmd_publish() {
         log "Release $tag 不存在，创建"
         gh release create "$tag" --repo "$repo" \
             --title "hermes-apk $tag" \
-            --notes "DSHA / Hermes debug APK（由 hermes-apk workflow 生成，debug keystore 签名，仅用于验证编译）" \
+            --notes "Hermes Android APK（由 hermes-apk workflow 生成；release 用 hermes 身份证书签名，debug 用调试证书）" \
             || fail "创建 Release $tag 失败（需要 contents: write）"
     fi
     log "上传 $name 到 $repo@$tag"
