@@ -420,6 +420,12 @@ cmd_verify_sign() {
     actual=$(grep -m1 -i 'SHA-256 digest' "${RUNNER_TEMP:-/tmp}/apk-certs.txt" | sed 's/.*: *//' \
         | tr -d ':' | tr 'A-F' 'a-f')
     log "产物证书 SHA-256：$actual"
+    case "$apk" in
+        *-debug.apk)
+            log "debug 包使用调试证书，跳过与发布身份的比对"
+            return 0
+            ;;
+    esac
     if [ -n "${HERMES_IDENTITY:-}" ] && [ -f "ci/release-identity.$HERMES_IDENTITY.json" ]; then
         expected=$(python3 tools/release-identity.py --identity "$HERMES_IDENTITY" --field certificateSha256)
         [ "$actual" = "$expected" ] \
