@@ -1164,11 +1164,20 @@ final class WebLifecycleController {
               "本次实际运行方式：%s", ProotBootstrap.runtimeLabel(selectedRuntime)));
       run.compatible = compatible;
       int preferred = config.getRequestedWebPort();
+      // Hermes 由 App 决定端口：auto 模式（0）也用首选端口，而不是让 guest 自己挑，
+      // 否则 App 不知道要探测哪个端口（watchHermesReadiness 需要具体端口）。
+      if (preferred == 0) preferred = com.deepseekharness.app.util.Constants.DSH_WEB_PORT;
       com.deepseekharness.app.util.WebPortPolicy.Choice ports =
           com.deepseekharness.app.util.WebPortPolicy.choose(
               preferred,
               config.fallbackWebPort(preferred),
               com.deepseekharness.app.util.WebPortPolicy::available);
+      if (ports.listen == 0) {
+        // 首选与备用都不可用时，仍要给 Hermes 一个具体端口：取一个当前空闲的环回端口。
+        ports =
+            com.deepseekharness.app.util.WebPortPolicy.direct(
+                ports.preferred, com.deepseekharness.app.util.WebPortPolicy.freeLoopback());
+      }
       if (!lifecycle.isCurrent(generation)) return;
       run.port = ports.listen;
       if (preferred > 0 && ports.fallback()) {

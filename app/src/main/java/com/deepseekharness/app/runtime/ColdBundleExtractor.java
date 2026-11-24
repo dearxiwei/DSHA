@@ -60,9 +60,15 @@ final class ColdBundleExtractor {
 
       boolean split =
           "split-runtime-v1".equals(boot.readAssetString("offline-rootfs.layout").trim());
-      ZipEntry runtime = split && apk != null ? apk.getEntry("assets/dsh-runtime.bin") : null;
+      // 过渡期：APK 里可能同时有 Hermes 与旧 dsh 覆盖层，优先 Hermes。
+      ZipEntry runtime = null;
+      if (split && apk != null) {
+        runtime = apk.getEntry("assets/hermes-runtime.bin");
+        if (runtime == null) runtime = apk.getEntry("assets/dsh-runtime.bin");
+      }
       if (split && apk != null && runtime == null)
-        throw new IOException(com.deepseekharness.app.util.UiText.text("APK 缺少独立 dsh 运行时，安装未完成"));
+        throw new IOException(
+            com.deepseekharness.app.util.UiText.text("APK 缺少独立运行时，安装未完成"));
       long totalBytes = archiveBytes;
       if (split)
         totalBytes =

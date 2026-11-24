@@ -42,6 +42,24 @@ public final class WebPortPolicy {
     return new Choice(preferred, 0);
   }
 
+  /**
+   * 直接指定端口对。
+   *
+   * <p>只在调用方必须在启动前就知道端口时使用：Hermes 只监听 loopback、没有可解析的鉴权链接，
+   * 就绪探测需要具体端口，不能像 dsh 那样把选择权交给 guest。
+   */
+  public static Choice direct(int preferred, int listen) {
+    return new Choice(preferred, listen);
+  }
+
+  /** 取一个当前空闲的环回端口；随即交给 guest 绑定，存在极小的抢用窗口。 */
+  public static int freeLoopback() throws IOException {
+    try (java.net.ServerSocket socket =
+        new java.net.ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress())) {
+      return socket.getLocalPort();
+    }
+  }
+
   /** Retry only a proven bind race of this launcher, before authentication and once. */
   public static boolean retryBindRace(
       int listen,
