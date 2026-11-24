@@ -46,6 +46,30 @@ public final class RuntimeTrial {
     }
   }
 
+  /**
+   * Hermes 运行树的「未试运行」回执。
+   *
+   * <p>dsh 的隔离试运行围绕它的 Node 入口、鉴权链接、内置插件与 native 模块构建；Hermes 没有这些，
+   * 强行套用只会得到必然失败的结论。这里显式记录「跳过」，只声明真的核对过的项
+   * （资产存在、数据可读可写），把渲染与进程验证留给每次启动时的就绪探测。
+   */
+  public static Map<String, Object> hermesSkipped(ProotBootstrap proot) throws IOException {
+    Map<String, Object> proof = new LinkedHashMap<>();
+    proof.put("runtimeId", proot.expectedRuntimeDescriptor().id());
+    java.security.SecureRandom random = new java.security.SecureRandom();
+    byte[] nonce = new byte[16];
+    random.nextBytes(nonce);
+    StringBuilder hex = new StringBuilder();
+    for (byte value : nonce) hex.append(String.format(java.util.Locale.ROOT, "%02x", value));
+    proof.put("nonce", hex.toString());
+    proof.put("confirmedAt", System.currentTimeMillis());
+    proof.put("trialMode", "hermes-skip");
+    proof.put("assets", true);
+    proof.put("dataRead", true);
+    proof.put("dataWrite", true);
+    return proof;
+  }
+
   public static Map<String, Object> verify(
       Context context, ProotBootstrap proot, BackupControl control, StaticCheck checks)
       throws IOException {

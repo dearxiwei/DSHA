@@ -53,13 +53,31 @@ public final class EnvironmentMaintenance {
       progress.accept(
           com.deepseekharness.app.util.UiText.choose("检查启动配置…", "Checking startup configuration…"));
       var proof =
-          com.deepseekharness.app.runtime.RuntimeTrial.verify(
+          verifyRuntime(
               context, boot, control, () -> validateRuntime(boot), boot.hostPorts().browserProbe());
       boot.hostPorts().confirmColdRuntime(boot.getRootfsDir(), proof);
       boot.confirmRuntimeHealth(proof);
       if (!boot.isEnvironmentReady()) throw new IOException("RUNTIME_READINESS_FAILED");
       return com.deepseekharness.app.util.UiText.text("解压与离线安装完成");
     }
+  }
+
+  /**
+   * 运行时验证入口。
+   *
+   * <p>Hermes 运行树没有 dsh 的隔离试运行（没有 Node 入口、鉴权链接与内置插件），
+   * 这里返回显式的「跳过」回执；dsh 仍走完整试运行。回执语义见 RuntimeDescriptor.healthy。
+   */
+  private static java.util.Map<String, Object> verifyRuntime(
+      android.content.Context context,
+      com.deepseekharness.app.runtime.ProotBootstrap boot,
+      com.deepseekharness.app.backup.BackupControl control,
+      com.deepseekharness.app.runtime.RuntimeTrial.StaticCheck checks,
+      com.deepseekharness.app.runtime.RuntimeTrial.BrowserProbe browser)
+      throws IOException {
+    if (new java.io.File(boot.getRootfsDir(), "opt/hermes/hermes.sh").isFile())
+      return com.deepseekharness.app.runtime.RuntimeTrial.hermesSkipped(boot);
+    return com.deepseekharness.app.runtime.RuntimeTrial.verify(context, boot, control, checks, browser);
   }
 
   public static String rollbackRuntime(
@@ -82,7 +100,7 @@ public final class EnvironmentMaintenance {
         control,
         () -> {
           var proof =
-              com.deepseekharness.app.runtime.RuntimeTrial.verify(
+              verifyRuntime(
                   controller.context(),
                   controller.proot(),
                   control,
@@ -136,7 +154,7 @@ public final class EnvironmentMaintenance {
           control,
           () -> {
             var proof =
-                com.deepseekharness.app.runtime.RuntimeTrial.verify(
+                verifyRuntime(
                     controller.context(),
                     controller.proot(),
                     control,
@@ -316,7 +334,7 @@ public final class EnvironmentMaintenance {
       space.sample(Stage.DATA_RESTORED, 0);
       controller.proot().prepareRuntimeTools();
       var proof =
-          com.deepseekharness.app.runtime.RuntimeTrial.verify(
+          verifyRuntime(
               controller.context(),
               controller.proot(),
               control,

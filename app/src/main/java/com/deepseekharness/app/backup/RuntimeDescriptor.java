@@ -146,6 +146,13 @@ public final class RuntimeDescriptor {
         || !runtimeId.equals(receipt.get("runtimeId"))
         || !(receipt.get("nonce") instanceof String)
         || !((String) receipt.get("nonce")).matches("[a-f0-9]{32}")) return false;
+    // Hermes 运行树没有 dsh 的隔离试运行；回执显式标注 trialMode=hermes-skip，
+    // 只要求真的核对过的项，渲染与进程由每次启动的就绪探测负责。
+    if ("hermes-skip".equals(receipt.get("trialMode"))) {
+      for (String check : Arrays.asList("assets", "dataRead", "dataWrite"))
+        if (!Boolean.TRUE.equals(receipt.get(check))) return false;
+      return true;
+    }
     try {
       long port = BackupJson.number(receipt, "port");
       if (port < 1 || port > 65535 || BackupJson.number(receipt, "confirmedAt") <= 0) return false;
