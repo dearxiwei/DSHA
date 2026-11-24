@@ -8,6 +8,7 @@
 # 用法：bash tools/hermes-apk-ci.sh <子命令>
 #   jdk        选出可用的 JDK 17（runner 目录名随镜像版本变化），导出 JAVA_HOME
 #   inputs     按固定输入锁还原 app/src/main/assets 下的离线输入（含 SHA-256 校验）
+#   hermes     按 ci/hermes-runtime.lock.json 还原可选 hermes 运行时（锁缺失则跳过）
 #   sdk        按 ci/toolchain.lock.json 安装 platform / build-tools / NDK
 #   qemu       让 x86_64 工具（Google aapt2、NDK llvm-strip）能在 arm64 宿主上执行
 #   evidence   打印 java / sdkmanager / NDK / aapt2 版本证据
@@ -27,7 +28,7 @@ log() { printf '==> %s\n' "$*"; }
 fail() { printf '::error::%s\n' "$*" >&2; exit 1; }
 
 usage() {
-    sed -n '2,21p' "$0"
+    sed -n '2,22p' "$0"
 }
 
 # ---------------------------------------------------------------- 通用探测
@@ -146,6 +147,26 @@ cmd_inputs() {
             fail "固定输入缺失：$path"
         fi
         printf '    %-24s %12s bytes  %s\n' "$name" "$(wc -c < "$path" | tr -d ' ')" \
+            "$(sha256sum "$path" | cut -d' ' -f1)"
+    done
+}
+
+# ---------------------------------------------------------------- hermes
+
+# hermes 运行时是独立于 bundle 的第二个固定输入：ci/hermes-runtime.lock.json 给出
+# url + sha256 + bytes，tools/ci-assets.py --hermes 校验后原子替换 app/src/main/assets 下的
+# hermes-runtime.bin 与它的 provenance。锁缺失时跳过，dsh 的现有路径不受影响。
+cmd_hermes() {
+    local name path
+    if [ ! -f ci/hermes-runtime.lock.json ]; then
+        log "没有 ci/hermes-runtime.lock.json，跳过 hermes 运行时（dsh 路径不受影响）"
+        return 0
+    fi
+    python3 tools/ci-assets.py --hermes
+    for name in hermes-runtime.bin hermes-runtime.inputs.json; do
+        path="app/src/main/assets/$name"
+        [ -f "$path" ] || fail "hermes 固定输入缺失：$path"
+        printf '    %-30s %12s bytes  %s\n' "$name" "$(wc -c < "$path" | tr -d ' ')" \
             "$(sha256sum "$path" | cut -d' ' -f1)"
     done
 }
@@ -478,6 +499,7 @@ cmd_publish() {
 case "${1:-}" in
     jdk) cmd_jdk ;;
     inputs) cmd_inputs ;;
+    hermes) cmd_hermes ;;
     sdk) cmd_sdk ;;
     qemu) cmd_qemu ;;
     evidence) cmd_evidence ;;

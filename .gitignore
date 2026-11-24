@@ -31,6 +31,9 @@ app/src/main/assets/adb-wheels.tar.gz
 app/src/main/assets/gh-cli.tar.gz
 app/src/main/assets/pnpm-runtime.bin
 app/src/main/assets/python-support.bin
+# hermes 运行时：过渡期第二个固定输入，按 ci/hermes-runtime.lock.json 还原，不进 git
+app/src/main/assets/hermes-runtime.bin
+app/src/main/assets/hermes-runtime.inputs.json
 
 # 发布 APK：走 GitHub Release 资产，不进 git
 release/*.apk

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "runtimeId": "b448370d4e84fad899a31bba8b2a6d396177b33b44eb537a0a30641c3736f158",
+  "runtimeId": "f0d3f6c8a1daca41e3705a43324a4296cc9cf31436548d8013b2b86198e350ad",
   "baseVersion": "10",
   "dshVersion": "0.2.2-rc.1",
   "launcherContract": "DSHA_ARM64_V2",
@@ -172,7 +172,7 @@
     "diagnostics/DiagnosticPrivacy.java": "b94d39648a159735e0e197948d1f55b2318b3694b6378ad952346fcff2f2bfbb",
     "diagnostics/Failure.java": "9c4c52d4205001a13d97141d3aa8edf7ddff23b4791eeafac64a4c5db9a2a74b",
     "generator:tools/apply-mobile-client-patches.mjs": "87eae5df9101f99cde20d0714ef6e1aa02946548a707d46b8f679c025f2a926f",
-    "generator:tools/asset-deployment.json": "b76357d1bc70a36dde7dcb57d523418bef664e0cc1df93bad112ce27476b8b19",
+    "generator:tools/asset-deployment.json": "ca96349a60846e0d6bbac9d2b2ff660b3e421e4076bb46060a3999eab3ea633c",
     "generator:tools/asset_deployment.py": "6ceaf13eee56b7719cdd17cd272e4daaa7dd930629fa249cb76a1e66b6794a5d",
     "generator:tools/backup-dependencies.lock.json": "891585530b7e3224f8ce8523ab2cf20b05dbaa4f472202742676f2799927ddbe",
     "generator:tools/file-transfer/client-controls.js": "da969151c8dfbd45592d2181588fdf237ee2ccfa7a412dcee897514cd58c5d71",
@@ -199,7 +199,7 @@
     "generator:tools/prepare-mobile-plugin.py": "93ca45c695241d5aa8f716db2d95f885ea674dd37d976f95fbda3e41d966b123",
     "generator:tools/prepare-plugin-pnpm-argv-patch.py": "21319bb25f453ecb0138b8c8bd287890642a935d8c3e6beca83e0f7b39da5ffa",
     "generator:tools/prepare-runtime-tools.py": "bb0852b1315d90bdae719dd049329c7213684a0d4e57fffd1d72d1d8b157c223",
-    "generator:tools/prepare-standard-assets.py": "e56b76ac7c960e6af581612064dce6333be1046ea7c78ec17ea9cfff298b192a",
+    "generator:tools/prepare-standard-assets.py": "35e3c8143bbc73b808837654ccf3939b3320eedd3b1c5660080dc9aabec50575",
     "generator:tools/prepare-web-languages.py": "df1a8148af9900f246a5ac9c20585463c8bd1e6f1fd6fa9b0468b74500c74380",
     "generator:tools/prepare-web-search-headers-patch.py": "7d0687035d44e4b40356460901937acc9a9f40b61b34dd8f9496ad1f0109d330",
     "generator:tools/prepare-welcome-notice-patch.py": "bf55798b52ea203c240798afdccb581e22937e645e652eec4ab4734ed65521a7",
@@ -699,5 +699,12 @@
     "web-integration/startup.js": "0c3de77ac63880500af0242815f117c9abadcb91e9f031de590b7259099f4dba",
     "welcome-notice-patch.json": "d81ac1acbb44c6628df88887d8d87fa0fb36982972bfda82e59630df0e8d5126",
     "workspace-directory-policy-patch.json": "3f21216c07373feaab0eb61456dd0ff5a2c9ab0be46ae4f0710a791790c3b538"
+  },
+  "hermes": {
+    "asset": "hermes-runtime.bin",
+    "sha256": "a9891a5476d03dfcb0174d8c0eb3c3b7e2076abfa14f26e8a7154de1210beaea",
+    "bytes": 315211863,
+    "version": "8c0fe7fe9af0",
+    "commit": "8c0fe7fe9af01ffbbdc718bc8e30e76e9a6e7316"
   }
 }

@@ -69,6 +69,13 @@ jobs:
           set -euo pipefail
           bash tools/hermes-apk-ci.sh inputs
 
+      - name: 还原 hermes 运行时（可选固定输入，ci/hermes-runtime.lock.json）
+        run: |
+          set -euo pipefail
+          # 独立于 bundle 的第二个固定输入：按锁下载、校验 SHA-256 与字节数后原子落盘；
+          # 锁缺失时本步跳过，dsh 的现有路径完全不变。
+          bash tools/hermes-apk-ci.sh hermes
+
       - name: 准备 JDK 17
         run: |
           set -euo pipefail

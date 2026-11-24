@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "runtime": "hermes",
+  "url": "https://github.com/dearxiwei/DSHA/releases/download/hermes-runtime-20261124/hermes-runtime.bin",
+  "sha256": "a9891a5476d03dfcb0174d8c0eb3c3b7e2076abfa14f26e8a7154de1210beaea",
+  "bytes": 315211863,
+  "format": "managed-tree",
+  "release": "hermes-runtime-20261124",
+  "asset": "hermes-runtime.bin",
+  "metaAsset": "hermes-runtime.inputs.json",
+  "metaUrl": "https://github.com/dearxiwei/DSHA/releases/download/hermes-runtime-20261124/hermes-runtime.inputs.json",
+  "metaSha256": "9ff239e045794183cede29f14bfc117f11ce13f2f59c0008e5faef041333673d",
+  "metaBytes": 993,
+  "version": "8c0fe7fe9af0",
+  "commit": "8c0fe7fe9af01ffbbdc718bc8e30e76e9a6e7316"
+}

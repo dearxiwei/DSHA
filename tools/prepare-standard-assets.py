@@ -14,8 +14,10 @@ import tarfile
 import importlib.util
 from generated_asset_directory import prune as prune_generated
 from asset_deployment import load_manifest, selected_assets, verify_reader_contracts, MANIFEST as DEPLOYMENT_MANIFEST
+from runtime_input_contract import hermes_lock, HERMES_ASSET, HERMES_META_ASSET
 
 GH_CLI_LOCK = Path(__file__).with_name('gh-cli') / 'packages.lock.json'
+REPO = Path(__file__).resolve().parents[1]
 
 GLOBAL_PACKAGE_ALIASES = {
     '@deepseek-ai/dsh-workflow-worker-thread': '@deepseek-ai/dsh-workflow-ptc',
@@ -37,6 +39,35 @@ def sha256(path):
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def hermes_evidence(source):
+    """hermes 运行时是过渡期第二固定输入：存在就必须与独立锁一致。
+
+    归档缺失时返回 None，生成目录与报告保持改造前的样子（dsh 路径行为不变）。
+    """
+    archive = source / HERMES_ASSET
+    if not archive.exists() and not archive.is_symlink():
+        return None
+    lock = hermes_lock(REPO)
+    if lock is None:
+        raise ValueError('缺少 ci/hermes-runtime.lock.json，无法确认 hermes 运行时身份')
+    if archive.is_symlink() or not archive.is_file() \
+            or archive.stat().st_size != lock['bytes'] or sha256(archive) != lock['sha256']:
+        raise ValueError('hermes-runtime.bin 与 ci/hermes-runtime.lock.json 不一致')
+    metadata = source / HERMES_META_ASSET
+    if metadata.is_symlink() or not metadata.is_file() \
+            or metadata.stat().st_size != lock['metaBytes'] or sha256(metadata) != lock['metaSha256']:
+        raise ValueError('hermes-runtime.inputs.json 与 ci/hermes-runtime.lock.json 不一致')
+    provenance = json.loads(metadata.read_text(encoding='utf-8'))
+    if provenance.get('archive_sha256') != lock['sha256'] \
+            or provenance.get('archive_bytes') != lock['bytes'] \
+            or provenance.get('version') != lock['version'] \
+            or provenance.get('hermesCommit') != lock['commit']:
+        raise ValueError('hermes 运行时 provenance 与 ci/hermes-runtime.lock.json 不一致')
+    return {'asset': HERMES_ASSET, 'sha256': lock['sha256'], 'bytes': lock['bytes'],
+            'version': lock['version'], 'commit': lock['commit'],
+            'provenanceSha256': lock['metaSha256']}
 
 
 def omit(name, foreign):
@@ -99,12 +130,16 @@ def main():
         raise ValueError("生成目录不能放在原始资产目录内")
     rootfs = source / "offline-rootfs.bin"
     runtime = source / "dsh-runtime.bin"
+    # 过渡期第二固定输入：hermes 归档缺失时 evidence 为 None，后续步骤与改造前一致。
+    hermes = hermes_evidence(source)
     deployment = load_manifest()
     verify_reader_contracts(source, deployment)
     selected = selected_assets(source, deployment)
     expected = {relative.as_posix() for _, relative in selected}
     expected.update({"web-integration/gecko-compat.js", "glibc-python.bin", "adb-wheels.bin",
                      "gh-cli.bin"})
+    if hermes:
+        expected.add(HERMES_ASSET)
     if rootfs.is_file():
         expected.update({"offline-rootfs.bin", "offline-rootfs.bytes", "offline-rootfs.sha256",
                          "offline-rootfs.layout", "dsh-runtime.bin", "dsh-runtime.sha256"})
@@ -134,6 +169,11 @@ def main():
     # 自动 gunzip 并去掉扩展名（AGP 9.1.1 sdk-common，aapt2 不这么做）。读取端按 magic 判断格式。
     for name in ("glibc-python", "adb-wheels", "gh-cli"):
         shutil.copyfile(source / (name + ".tar.gz"), output / (name + ".bin"))
+    if hermes:
+        # 字节已在 hermes_evidence 里核对过锁与 provenance，这里只复制并留证据。
+        # provenance 本身留在源固定输入里（不进 APK），摘要写进 standard-assets-report.json。
+        shutil.copyfile(source / HERMES_ASSET, output / HERMES_ASSET)
+        print("hermes 运行时: %s bytes, sha256 %s" % (hermes["bytes"], hermes["sha256"]))
     if not rootfs.is_file():
         (output / "offline-rootfs.bin").unlink(missing_ok=True)
         for name in ('dsh-runtime.bin', 'dsh-runtime.sha256', 'offline-rootfs.layout'):
@@ -192,6 +232,10 @@ def main():
             if cached.get("inputs") == signature and cached.get("output_sha256") == sha256(optimized) and cached.get('unpacked_bytes', 0) > 0:
                 write_source_text(output / 'offline-rootfs.bytes',str(cached['unpacked_bytes']) + '\n',encoding='ascii')
                 write_source_text(output / 'offline-rootfs.sha256',cached['output_sha256'] + '\n',encoding='ascii')
+                # hermes 不进 rootfs 缓存键（换 hermes 不该重做 700 MB rootfs），只刷新证据。
+                if cached.get("hermes") != hermes:
+                    cached["hermes"] = hermes
+                    write_source_text(report_path,json.dumps(cached, indent=2, ensure_ascii=False),encoding="utf-8")
                 print("rootfs 内容未变化，复用已校验的减重资产")
                 return
         except (ValueError, OSError):
@@ -246,6 +290,7 @@ def main():
                   removed_unpacked_bytes=dict(removed), foreign_packages=sorted(foreign),
                   kept_paths_sha256=kept.hexdigest(),
                   inputs=signature, output_sha256=sha256(optimized),
+                  hermes=hermes,
                   note="新 dsh 及依赖只保留一份；环境更新须经过用户数据迁移及校验，禁止直接清空旧数据")
     write_source_text(report_path,json.dumps(report, indent=2, ensure_ascii=False),encoding="utf-8")
     write_source_text(output / 'offline-rootfs.bytes',str(kept_bytes) + '\n',encoding='ascii')

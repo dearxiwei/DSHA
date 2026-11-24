@@ -320,9 +320,12 @@ def stage_runtime(lock: dict, stage: Path, cache: Path, skip_verify: bool) -> di
     write_entry_script(stage, lock["layout"])
 
     if not skip_verify:
+        # PYTHONDONTWRITEBYTECODE：导入自检不能往随包 python 树里写 __pycache__，
+        # 否则归档里混入带时间戳的 .pyc，同一份输入两次构建摘要就不同。
         run([str(python_bin), "-c",
              "import fastapi, uvicorn, ptyprocess, hermes_cli.main"], cwd=app,
-            env={"PYTHONPATH": str(app), "HERMES_HOME": str(cache / "home")})
+            env={"PYTHONPATH": str(app), "HERMES_HOME": str(cache / "home"),
+                 "PYTHONDONTWRITEBYTECODE": "1"})
 
     return {"version": version, "app": app, "python": python_bin}
 
@@ -524,6 +527,8 @@ def main() -> int:
         return 0
 
     staged = stage_runtime(lock, args.stage, args.cache, args.skip_verify)
+    # 兜底清掉 python 树里任何字节码缓存，保证同一组输入产出同一摘要。
+    prune(args.stage, ["**/__pycache__", "**/*.pyc"])
     relocated = relocate_entry_scripts(args.stage, lock["layout"])
     if relocated:
         print(f"已重写 {len(relocated)} 个入口脚本 shebang", file=sys.stderr)

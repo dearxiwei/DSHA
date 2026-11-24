@@ -145,9 +145,36 @@ python3 tools/ci-assets.py --archive dsha-a-su-fixed-inputs-20261105e.zip \
 替换会改变 asset id，必须同步更新锁，并在提交说明里记录替换原因。正常输入升级应使用新 tag + 新日期文件名，
 保留旧资产与旧 SHA-256 证据。
 
+## 可选的第二个固定输入：hermes 运行时（过渡期）
+
+内置 DSH 换成本地构建的 Hermes 运行时后，`hermes-runtime.bin` 作为**独立**固定输入随 APK 打包。
+它不进上面的 bundle：`tools/ci-assets.py` 的 `NAMES` 与成员集合仍是 12 项，bundle 语义不变；
+它也**不改** `runtime-descriptor.json` 的 `dshVersion` 与 `inputs`（dsh 仍在同一个 APK 里）。
+
+- 锁：[`ci/hermes-runtime.lock.json`](../ci/hermes-runtime.lock.json)——归档 `url` + `sha256` + `bytes`，
+  外加 provenance `hermes-runtime.inputs.json` 的 `metaUrl` / `metaSha256` / `metaBytes`，
+  以及 `version` / `commit`（必须与 provenance 的 `version` / `hermesCommit` 一致）。
+- 还原：`python3 tools/ci-assets.py --hermes`（CI 里是 `bash tools/hermes-apk-ci.sh hermes`）。
+  先把归档与 provenance 复制到临时目录逐份校验，再原子替换
+  `app/src/main/assets/hermes-runtime.bin` 与 `app/src/main/assets/hermes-runtime.inputs.json`；
+  锁不存在时跳过且不报错，dsh 的现有路径完全不变。
+- 描述符：`tools/prepare-runtime-descriptor.py` 在锁存在时追加只读的 `hermes` 段
+  （`asset` / `sha256` / `bytes` / `version` / `commit`）。它不是 dsh 身份字段
+  （Java 侧 `RuntimeDescriptor.IDENTITY_FIELDS` 不含它），过渡期 `runtimeId`、`dshVersion`
+  仍只由内置 DSH 决定；`hermes-runtime.bin` 落盘后 `prepare-runtime-descriptor.py --check`
+  会额外核对实际字节。
+- 生成目录：`tools/prepare-standard-assets.py` 只在归档存在时把 `hermes-runtime.bin` 复制进
+  `generated/standardAssets`，并把归档与 provenance 的摘要写进 `standard-assets-report.json` 的
+  `hermes` 字段（provenance 本身不进 APK）；归档缺失时不复制、不报错，`offline-rootfs.layout`
+  语义不变。
+
+来源（2026-11-24）：`hermes-runtime-20261124` 的 `hermes-runtime.inputs.json` 自述
+`archive_sha256` / `archive_bytes`，与直链 `Content-Length: 315211863` 一致。
+
 ## 相关文件
 
 - [`ci/sunset-inputs.lock.json`](../ci/sunset-inputs.lock.json)：当前资产锁。
+- [`ci/hermes-runtime.lock.json`](../ci/hermes-runtime.lock.json)：可选的 hermes 运行时锁。
 - [`tools/ci-assets.py`](../tools/ci-assets.py)：打包 / 下载 / 校验 / 还原唯一入口。
 - [`tools/sunset-ci-inputs.py`](../tools/sunset-ci-inputs.py)：CI 输入解析（锁与显式成对覆盖）。
 - [`tools/test-sunset-ci-inputs.py`](../tools/test-sunset-ci-inputs.py)：锁与解析行为的宿主回归。

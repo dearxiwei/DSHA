@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import re
 import sys
-from runtime_input_contract import load, asset_paths, launcher_paths, relative
+from runtime_input_contract import load, asset_paths, launcher_paths, relative, hermes_section
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -87,7 +87,13 @@ def build_descriptor(root):
                 'dataRead': previous + ['dsh-' + version], 'dataWrite': 'dsh-' + version,
                 'inputs': inputs}
     identity = hashlib.sha256(json.dumps(contract, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-    return dict(version=1, runtimeId=identity, **contract)
+    descriptor = dict(version=1, runtimeId=identity, **contract)
+    # 过渡期第二个固定输入：hermes 段只作诊断/证据，不进身份（Java 侧
+    # RuntimeDescriptor.IDENTITY_FIELDS 没有它），dshVersion 仍是内置 DSH。
+    hermes = hermes_section(root)
+    if hermes is not None:
+        descriptor['hermes'] = hermes
+    return descriptor
 
 def main(args):
     output = build_descriptor(ROOT)

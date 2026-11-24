@@ -341,6 +341,10 @@ def prepareStandardAssets = tasks.register("prepareStandardAssets", Exec) {
     inputs.dir(rootProject.file("tools/ubuntu-tools"))
     inputs.file(rootProject.file("tools/prepare-gh-cli.py"))
     inputs.files(rootProject.files("tools/gh-cli/packages.lock.json"))
+    // hermes 运行时是过渡期第二固定输入：还原后可进 APK，缺失时这里不报错。
+    inputs.files(file("src/main/assets/hermes-runtime.bin"), file("src/main/assets/hermes-runtime.inputs.json"))
+            .withPropertyName("hermesRuntimeInputs").optional()
+    inputs.file(rootProject.file("ci/hermes-runtime.lock.json"))
     outputs.dir(layout.buildDirectory.dir("generated/standardAssets"))
     outputs.file(layout.buildDirectory.file("generated/standard-assets-report.json"))
     commandLine(System.getenv("DSHA_PYTHON") ?: "python3", "-B",
@@ -380,6 +384,10 @@ def prepareRuntimeDescriptor = tasks.register("prepareRuntimeDescriptor", Exec) 
     }
     runtimeInputContract.launcherSources.each { inputs.file(file("src/main/java/com/deepseekharness/app/${it}")) }
     (runtimeInputContract.generatorSources ?: []).each { inputs.file(rootProject.file(it)) }
+    // hermes 段来自独立锁；归档是可选输入，未还原时不参与描述符校验。
+    inputs.file(rootProject.file("ci/hermes-runtime.lock.json"))
+    inputs.files(file("src/main/assets/hermes-runtime.bin"), file("src/main/assets/hermes-runtime.inputs.json"))
+            .withPropertyName("hermesRuntimeInputs").optional()
     outputs.file(file("src/main/assets/runtime-descriptor.json"))
     commandLine(System.getenv("DSHA_PYTHON") ?: "python3", "-B", rootProject.file("tools/prepare-runtime-descriptor.py").absolutePath, "--check")
 }
