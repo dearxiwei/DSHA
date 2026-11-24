@@ -1,0 +1,113 @@
+# 状态：新增（Hermes/M1A）。仅手动 dispatch 触发，不随 push 运行。
+# 目标：在不使用任何 GitHub 官方 action 的前提下编出 Standard debug APK，
+#       用来验证 Java / 资源改动还能编译通过。
+#
+# 为什么用 x86_64 而不是 arm64：aapt2 与 NDK 的 llvm-strip 只有 x86_64 版，
+# 标准 Ubuntu 镜像原生预装 Android SDK；arm64 镜像既没有 SDK 又要靠 qemu 跑 aapt2。
+#
+# 硬约束（已实测，违反即 startup_failure）：
+#   本仓库 Actions 策略是 allowed_actions=local_only，workflow 里只要出现官方 action 引用
+#   （即任何 `uses` 步骤，含 checkout / upload-artifact / cache）就整份 workflow 起不来。
+#   因此：源码用 tarball 取；产物用 `gh release upload` 上传；工具链由 sdkmanager 现场装。
+#   具体命令集中在 tools/hermes-apk-ci.sh（POSIX sh，本地也能复用），本文件只按顺序调用。
+name: hermes-apk
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "APK 上传到的 Release tag（不存在会自动创建）"
+        type: string
+        default: hermes-apk-debug
+      task:
+        description: "Gradle 任务（默认编译 Standard debug APK）"
+        type: string
+        default: ":app:assembleStandardDebug"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hermes-apk-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    name: Build Standard debug APK
+    # x86_64：Android SDK 预装、aapt2/NDK 原生可执行（arm64 盘需要 qemu 且无预装 SDK）。
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      HERMES_TASK: ${{ inputs.task }}
+      HERMES_RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - name: 取源码（tarball，不使用官方 action）
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "${{ github.server_url }}/${{ github.repository }}/archive/${{ github.sha }}.tar.gz" \
+            | tar -xz --strip-components=1
+          # 工作区因此没有 .git：后面所有 gh 命令都必须显式 --repo。
+          test -f build.sh
+          test -f tools/hermes-apk-ci.sh
+          test -f tools/ci-assets.py
+          test -f ci/sunset-inputs.lock.json
+
+      - name: 解析固定输入（ci/sunset-inputs.lock.json）
+        id: resolve
+        run: |
+          set -euo pipefail
+          # 仓库自带的解析器负责 schema / https / 64 位小写 sha 的校验，并写进 GITHUB_OUTPUT。
+          python3 tools/sunset-ci-inputs.py --github-output
+
+      - name: 恢复固定输入（逐成员 SHA-256 校验）
+        env:
+          HERMES_INPUT_URL: ${{ steps.resolve.outputs.url }}
+          HERMES_INPUT_SHA: ${{ steps.resolve.outputs.sha256 }}
+          HERMES_INPUT_FORMAT: ${{ steps.resolve.outputs.format }}
+        run: |
+          set -euo pipefail
+          bash tools/hermes-apk-ci.sh inputs
+
+      - name: 准备 JDK 17
+        run: |
+          set -euo pipefail
+          bash tools/hermes-apk-ci.sh jdk
+
+      - name: 安装 Android SDK 组件（platform / build-tools / NDK）
+        run: |
+          set -euo pipefail
+          bash tools/hermes-apk-ci.sh sdk
+
+      - name: 准备 x86_64 兼容层（x86_64 宿主上为空操作）
+        run: |
+          set -euo pipefail
+          bash tools/hermes-apk-ci.sh qemu
+
+      - name: 打印版本证据
+        run: |
+          set -euo pipefail
+          bash tools/hermes-apk-ci.sh evidence
+
+      - name: 编译 APK
+        run: |
+          set -euo pipefail
+          bash tools/hermes-apk-ci.sh build
+
+      - name: 定位 APK 并打印 sha256 与大小
+        run: |
+          set -euo pipefail
+          bash tools/hermes-apk-ci.sh artifact
+
+      - name: 写入运行摘要
+        run: |
+          set -euo pipefail
+          bash tools/hermes-apk-ci.sh summary
+
+      - name: 上传到 Release
+        env:
+          # 只有这一步需要写权限令牌；源码是 tarball 解出来的，没有 .git，gh 必须显式 --repo。
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          bash tools/hermes-apk-ci.sh publish
