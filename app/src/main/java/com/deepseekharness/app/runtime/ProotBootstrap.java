@@ -198,6 +198,9 @@ public class ProotBootstrap {
 
   /** Prepares the shared current recipe chain for cold, managed and installed roots. */
   public void ensureDshRuntimePatches() {
+    // 纯 Hermes 运行树没有 @deepseek-ai/dsh，补丁链无从施加；过渡期两种运行树二选一。
+    if (!new java.io.File(rootfsDir, "usr/local/lib/node_modules/@deepseek-ai/dsh").isDirectory())
+      return;
     execution.ensurePatches();
   }
 

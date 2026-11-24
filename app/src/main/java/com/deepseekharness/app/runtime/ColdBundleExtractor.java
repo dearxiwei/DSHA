@@ -61,14 +61,26 @@ final class ColdBundleExtractor {
       boolean split =
           "split-runtime-v1".equals(boot.readAssetString("offline-rootfs.layout").trim());
       // 过渡期：APK 里可能同时有 Hermes 与旧 dsh 覆盖层，优先 Hermes。
+      String runtimeAsset = null;
       ZipEntry runtime = null;
-      if (split && apk != null) {
-        runtime = apk.getEntry("assets/hermes-runtime.bin");
-        if (runtime == null) runtime = apk.getEntry("assets/dsh-runtime.bin");
+      if (split) {
+        if (apk == null) {
+          runtimeAsset = "hermes-runtime.bin";
+        } else {
+          runtime = apk.getEntry("assets/hermes-runtime.bin");
+          if (runtime != null) runtimeAsset = "hermes-runtime.bin";
+          else {
+            runtime = apk.getEntry("assets/dsh-runtime.bin");
+            if (runtime != null) runtimeAsset = "dsh-runtime.bin";
+          }
+        }
       }
       if (split && apk != null && runtime == null)
         throw new IOException(
             com.deepseekharness.app.util.UiText.text("APK 缺少独立运行时，安装未完成"));
+      // Hermes 覆盖层是 opt/hermes 整棵树，不满足 dsh 的拆包合并契约（node_modules +
+      // bin/dsh + share/dsha），所以直接顺序解压，不走 ColdSplitExtraction。
+      boolean hermesRuntime = "hermes-runtime.bin".equals(runtimeAsset);
       long totalBytes = archiveBytes;
       if (split)
         totalBytes =
@@ -81,7 +93,7 @@ final class ColdBundleExtractor {
       boot.rootfsDir.mkdirs();
       boot.extractionStage(
           onProgress, com.deepseekharness.app.util.UiText.text("解压 Ubuntu 与 Node"));
-      if (split && boot.coldCandidate != null) {
+      if (split && boot.coldCandidate != null && !hermesRuntime) {
         boot.requireColdCandidate();
         try (InputStream input =
             apk == null
@@ -103,10 +115,12 @@ final class ColdBundleExtractor {
         progress.flush();
         if (split) {
           boot.extractionStage(
-              onProgress, com.deepseekharness.app.util.UiText.text("解压 dsh 与内置依赖"));
+              onProgress,
+              com.deepseekharness.app.util.UiText.text(
+                  hermesRuntime ? "解压 Hermes 运行时" : "解压 dsh 与内置依赖"));
           try (InputStream input =
               apk == null
-                  ? boot.ctx.getAssets().open("dsh-runtime.bin")
+                  ? boot.ctx.getAssets().open(runtimeAsset)
                   : apk.getInputStream(runtime)) {
             TarGzipExtractor.extractAuto(progress.count(input), boot.rootfsDir, 0);
             progress.flush();
