@@ -121,10 +121,18 @@ final class ManagedRuntimeAssets {
     File root = new File(stage, "linux/ubuntu");
     if (!root.mkdirs()) throw new IOException(UiText.text("无法建立独立运行时暂存目录"));
     final String prefix = ManagedRuntimeLayout.DSH;
-    progress.accept(UiText.text("正在解压新版 dsh（保留现有 Ubuntu 与个人目录）…"));
+    final String hermes = ManagedRuntimeLayout.HERMES;
+    progress.accept(UiText.text("正在解压新版运行时（保留现有 Ubuntu 与个人目录）…"));
     try (ZipFile apk = new ZipFile(context.getPackageCodePath())) {
       boolean split = apk.getEntry("assets/offline-rootfs.layout") != null;
-      ZipEntry bundle = split ? apk.getEntry("assets/dsh-runtime.bin") : legacyArchive.find(apk);
+      ZipEntry bundle = null;
+      if (split) {
+        // 过渡期两种归档都可能出现：优先 Hermes，其次旧的 dsh 覆盖层。
+        bundle = apk.getEntry("assets/hermes-runtime.bin");
+        if (bundle == null) bundle = apk.getEntry("assets/dsh-runtime.bin");
+      } else {
+        bundle = legacyArchive.find(apk);
+      }
       if (bundle == null) throw new IOException(UiText.text("APK 没有内置运行时"));
       try (InputStream input = apk.getInputStream(bundle)) {
         TarGzipExtractor.extractSelected(
@@ -134,8 +142,11 @@ final class ManagedRuntimeAssets {
             name ->
                 name.equals(prefix)
                     || name.startsWith(prefix + "/")
+                    || name.equals(hermes)
+                    || name.startsWith(hermes + "/")
                     || ManagedRuntimeLayout.alias(name)
-                    || name.equals("usr/local/share/dsha/dsh-runtime.version"));
+                    || name.equals("usr/local/share/dsha/dsh-runtime.version")
+                    || name.equals("usr/local/share/dsha/hermes-runtime.version"));
       }
     }
     progress.accept(UiText.text("正在准备新版内置插件和界面适配…"));

@@ -9,10 +9,17 @@ public final class ManagedRuntimeLayout {
 
   public static final String ROOT = GuestPaths.ROOT_RELATIVE + "/";
   public static final String DSH = "usr/local/lib/node_modules/@deepseek-ai/dsh";
+  /**
+   * Hermes 运行树（离线覆盖层，见 tools/hermes-runtime/README.md）。
+   *
+   * <p>与 DSH 并存而不是替换：过渡期两种归档都可能出现在 APK 里，解压时按存在性选择。
+   */
+  public static final String HERMES = "opt/hermes";
 
   public static List<String> paths() {
     List<String> out = new ArrayList<>();
     out.add(DSH);
+    out.add(HERMES);
     out.add("usr/local/share/dsha/dsh-runtime.version");
     out.add("usr/local/share/dsha/ca-certificates.crt");
     out.add("usr/local/share/dsha/dns-compat.cjs");
@@ -61,6 +68,7 @@ public final class ManagedRuntimeLayout {
 
   public static boolean alias(String path) {
     if (path.equals("usr/local/bin/dsh")
+        || path.equals("usr/local/bin/hermes")
         || path.equals("usr/local/bin/tsc")
         || path.equals("usr/local/bin/tsserver")) return true;
     String prefix = "usr/local/lib/node_modules/";

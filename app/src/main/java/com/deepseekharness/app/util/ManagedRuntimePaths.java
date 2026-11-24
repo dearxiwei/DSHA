@@ -36,14 +36,15 @@ public final class ManagedRuntimePaths {
     List<String> paths = new ArrayList<>();
     for (String path : ManagedRuntimeLayout.paths()) paths.add(ManagedRuntimeLayout.ROOT + path);
     File global = new File(listedRoot, "usr/local/lib/node_modules");
-    File[] packages = requiredList(view, global);
-    for (File file : packages) {
+    // Hermes 运行树没有 node_modules；缺失时只代表没有包别名，不是环境不可读。
+    File[] packages = view.list(global);
+    for (File file : packages == null ? new File[0] : packages) {
       if (file.getName().startsWith("@") && !view.symbolic(file)) {
         for (File child : requiredList(view, file))
           addAlias(paths, listedRoot, currentRoot, child, view);
       } else addAlias(paths, listedRoot, currentRoot, file, view);
     }
-    for (String name : new String[] {"dsh", "tsc", "tsserver"})
+    for (String name : new String[] {"dsh", "hermes", "tsc", "tsserver"})
       addAlias(paths, listedRoot, currentRoot, new File(listedRoot, "usr/local/bin/" + name), view);
     for (Marker marker : Marker.values()) paths.add(marker.relative);
     return paths;
@@ -65,12 +66,17 @@ public final class ManagedRuntimePaths {
         alias.getAbsolutePath().substring(prefix.length()).replace(File.separatorChar, '/');
     if (!ManagedRuntimeLayout.alias(relative)) throw new IOException("MANAGED_ALIAS_SCOPE");
     File current = new File(currentRoot, relative);
-    boolean owned =
-        view.symbolic(current)
-            && view.canonical(current)
-                .startsWith(
-                    view.canonical(new File(currentRoot, ManagedRuntimeLayout.DSH))
-                        + File.separator);
+    boolean owned = false;
+    if (view.symbolic(current)) {
+      String target = view.canonical(current);
+      for (String base :
+          new String[] {ManagedRuntimeLayout.DSH, ManagedRuntimeLayout.HERMES}) {
+        File owner = new File(currentRoot, base);
+        if (!view.exists(owner) && !view.symbolic(owner)) continue;
+        String ownerPath = view.canonical(owner);
+        if (ownerPath != null && target.startsWith(ownerPath + File.separator)) owned = true;
+      }
+    }
     if (!view.exists(current) && !view.symbolic(current) || owned)
       paths.add(ManagedRuntimeLayout.ROOT + relative);
   }
