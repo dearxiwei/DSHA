@@ -13,7 +13,8 @@
 #   qemu       让 x86_64 工具（Google aapt2、NDK llvm-strip）能在 arm64 宿主上执行
 #   evidence   打印 java / sdkmanager / NDK / aapt2 版本证据
 #   build      调用 build.sh 编译指定 Gradle 任务（默认 :app:assembleStandardDebug）
-#   artifact   定位 APK，打印 sha256 与大小，并导出给后续步骤
+#   artifact   定位 APK（release 优先），打印 sha256 与大小，并导出给后续步骤
+#   verify-sign 用 apksigner 校验产物签名，并与 ci/release-identity.<身份>.json 的证书摘要对比
 #   summary    把构建身份写进 $GITHUB_STEP_SUMMARY
 #   publish    用 gh release upload 上传产物（工作区没有 .git，必须显式 --repo）
 #
@@ -387,7 +388,12 @@ cmd_build() {
     log "构建 $task（Maven 走镜像，完整日志 $log_file）"
     # 同时「流式输出到 CI 日志」和「保留真实退出码」：POSIX sh 没有 pipefail，
     # 所以让写日志的管道里先记下 build.sh 的状态码，再从文件读回来。
-    { bash build.sh -I "$init" "$task" 2>&1; printf '%s\n' "$?" > "$status_file"; } | tee "$log_file"
+    set -- -I "$init"
+    # 发布身份：默认 hermes（本 fork 正式身份）；debug 构建传 upstream 也不会用发布证书。
+    if [ -n "${HERMES_IDENTITY:-}" ]; then
+        set -- "$@" "-Pdsha.identity=$HERMES_IDENTITY"
+    fi
+    { bash build.sh "$@" "$task" 2>&1; printf '%s\n' "$?" > "$status_file"; } | tee "$log_file"
     status=$(cat "$status_file" 2>/dev/null || echo 1)
     if [ "$status" -ne 0 ]; then
         printf '::error::构建失败（退出码 %s），日志尾部：\n' "$status" >&2
@@ -397,20 +403,47 @@ cmd_build() {
     log "构建成功"
 }
 
+# ---------------------------------------------------------------- verify-sign
+
+# 用 SDK 的 apksigner 校验产物证书，并与身份文件里的 certificateSha256 对比。
+cmd_verify_sign() {
+    local apk sdk tools apksigner expected actual
+    apk="${HERMES_APK:-}"
+    [ -n "$apk" ] && [ -f "$apk" ] || fail "没有 APK 可校验（先运行 artifact 子命令）"
+    sdk=$(sdk_root || true)
+    [ -n "$sdk" ] || fail "找不到 Android SDK"
+    tools=$(python3 tools/ci-toolchain.py --field buildTools)
+    apksigner="$sdk/build-tools/$tools/apksigner"
+    [ -x "$apksigner" ] || fail "找不到 apksigner：$apksigner"
+    "$apksigner" verify --print-certs "$apk" > "${RUNNER_TEMP:-/tmp}/apk-certs.txt" \
+        || fail "apksigner 校验失败"
+    actual=$(grep -m1 -i 'SHA-256 digest' "${RUNNER_TEMP:-/tmp}/apk-certs.txt" | sed 's/.*: *//' \
+        | tr -d ':' | tr 'A-F' 'a-f')
+    log "产物证书 SHA-256：$actual"
+    if [ -n "${HERMES_IDENTITY:-}" ] && [ -f "ci/release-identity.$HERMES_IDENTITY.json" ]; then
+        expected=$(python3 tools/release-identity.py --identity "$HERMES_IDENTITY" --field certificateSha256)
+        [ "$actual" = "$expected" ] \
+            || fail "签名证书与 ci/release-identity.$HERMES_IDENTITY.json 不一致（期望 $expected）"
+        log "证书与 $HERMES_IDENTITY 身份一致"
+    fi
+}
+
 # ---------------------------------------------------------------- artifact
 
 cmd_artifact() {
     local dir apk bytes sha
-    dir="app/build/outputs/apk/standard/debug"
     apk=""
-    for candidate in "$dir/app-standard-debug.apk" "$dir"/*.apk; do
-        if [ -f "$candidate" ]; then
-            apk="$candidate"
-            break
-        fi
+    for dir in app/build/outputs/apk/standard/release app/build/outputs/apk/standard/debug; do
+        for candidate in "$dir"/*.apk; do
+            if [ -f "$candidate" ]; then
+                apk="$candidate"
+                break
+            fi
+        done
+        [ -n "$apk" ] && break
     done
     if [ -z "$apk" ]; then
-        printf '::error::没有找到 debug APK（目录 %s）\n' "$dir" >&2
+        printf '::error::没有找到 APK（standard/release 或 standard/debug）\n' >&2
         ls -l app/build/outputs/apk 2>/dev/null >&2 || true
         exit 1
     fi
@@ -419,6 +452,13 @@ cmd_artifact() {
     printf 'APK       : %s\n' "$apk"
     printf '大小      : %s bytes\n' "$bytes"
     printf 'SHA-256   : %s\n' "$sha"
+    # 包名/版本证据：正式身份是否正确，靠这个核对（不依赖 Java）。
+    if sdk=$(sdk_root 2>/dev/null); then
+        aapt2="$sdk/build-tools/$(python3 tools/ci-toolchain.py --field buildTools)/aapt2"
+        if [ -x "$aapt2" ]; then
+            "$aapt2" dump badging "$apk" 2>/dev/null | sed -n 's/^package: /package   : /p' | head -1
+        fi
+    fi
     export_env HERMES_APK "$apk"
     export_env HERMES_APK_SHA256 "$sha"
     export_env HERMES_APK_BYTES "$bytes"
@@ -504,6 +544,7 @@ case "${1:-}" in
     qemu) cmd_qemu ;;
     evidence) cmd_evidence ;;
     build) shift; cmd_build "${1:-}" ;;
+    verify-sign) cmd_verify_sign ;;
     artifact) cmd_artifact ;;
     summary) cmd_summary ;;
     publish) shift; cmd_publish "${1:-}" ;;

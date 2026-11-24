@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "identity": "hermes",
+  "packageName": "io.github.dearxiwei.hermes",
+  "certificateSha256": "e213dcfc325a2e332d76974955028aacef45ca5ad0e748965bd78b0a43e60c3f",
+  "schemes": ["v1", "v2", "v3"],
+  "appName": "Hermes Android",
+  "keyAlias": "hermes",
+  "testSuffix": ".test",
+  "devSuffix": ".dev",
+  "tagPrefix": "hermes-build",
+  "apkPrefix": "hermes",
+  "repository": "dearxiwei/DSHA",
+  "ref": "refs/heads/main",
+  "privateRepository": false,
+  "workflow": ".github/workflows/hermes-apk.yml"
+}

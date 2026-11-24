@@ -56,7 +56,7 @@ class Resolution(unittest.TestCase):
 
     def test_identities_never_share_signing_or_package(self):
         loaded = identity.check()
-        self.assertEqual(set(loaded), {"mod", "upstream"})
+        self.assertEqual(set(loaded), {"hermes", "mod", "upstream"})
         legacy = json.loads((ROOT / "ci/release-identity.json").read_text(encoding="utf-8"))
         for key in ("packageName", "certificateSha256", "schemes"):
             self.assertEqual(legacy[key], loaded["mod"][key], key)

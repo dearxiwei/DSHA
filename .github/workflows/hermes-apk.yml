@@ -20,9 +20,13 @@ on:
         type: string
         default: hermes-apk-debug
       task:
-        description: "Gradle 任务（默认编译 Standard debug APK）"
+        description: "Gradle 任务（默认编译 Standard debug APK；正式包用 :app:assembleStandardRelease）"
         type: string
         default: ":app:assembleStandardDebug"
+      identity:
+        description: "发布身份（hermes/mod/upstream）；release 构建必须给对应证书 secret"
+        type: string
+        default: "hermes"
 
 permissions:
   contents: write
@@ -40,6 +44,7 @@ jobs:
     env:
       HERMES_TASK: ${{ inputs.task }}
       HERMES_RELEASE_TAG: ${{ inputs.release_tag }}
+      HERMES_IDENTITY: ${{ inputs.identity }}
     steps:
       - name: 取源码（tarball，不使用官方 action）
         run: |
@@ -91,6 +96,27 @@ jobs:
           set -euo pipefail
           bash tools/hermes-apk-ci.sh qemu
 
+      - name: 准备发布签名材料（存在 secret 才启用）
+        env:
+          DSHA_KEYSTORE_BASE64: ${{ secrets.DSHA_KEYSTORE_BASE64 }}
+          DSHA_KEYSTORE_PASSWORD: ${{ secrets.DSHA_KEYSTORE_PASSWORD }}
+          DSHA_KEY_ALIAS: ${{ secrets.DSHA_KEY_ALIAS }}
+          DSHA_KEY_PASSWORD: ${{ secrets.DSHA_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DSHA_KEYSTORE_BASE64:-}" ]; then
+            echo "::notice::没有 DSHA_KEYSTORE_BASE64 secret，正式包会被签名门禁阻止"
+            exit 0
+          fi
+          umask 077
+          printf '%s' "$DSHA_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+          {
+            echo "DSHA_KEYSTORE=$RUNNER_TEMP/release.p12"
+            echo "DSHA_KEYSTORE_PASSWORD=$DSHA_KEYSTORE_PASSWORD"
+            echo "DSHA_KEY_ALIAS=$DSHA_KEY_ALIAS"
+            echo "DSHA_KEY_PASSWORD=$DSHA_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
       - name: 打印版本证据
         run: |
           set -euo pipefail
@@ -105,6 +131,11 @@ jobs:
         run: |
           set -euo pipefail
           bash tools/hermes-apk-ci.sh artifact
+
+      - name: 校验产物签名
+        run: |
+          set -euo pipefail
+          bash tools/hermes-apk-ci.sh verify-sign
 
       - name: 写入运行摘要
         run: |

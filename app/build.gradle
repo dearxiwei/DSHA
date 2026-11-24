@@ -53,10 +53,10 @@ def testVariantLabel = debugPackage ? 'Debug' : devPackage ? 'Dev' : sunsetTest 
 // 两套身份的包名、显示名、测试后缀、默认 key alias 与核对证书都从 ci/release-identity.<name>.json 读取；
 // versionCode / versionName 共用。未知值直接失败，不回退到任一身份，签名身份绝不混用。
 // 解析规则与 tools/release-identity.py 一致，由 tools/test-release-identity.py 交叉核对。
-def releaseIdentityNames = ['mod', 'upstream']
+def releaseIdentityNames = ['hermes', 'mod', 'upstream']
 def releaseIdentityName = (project.findProperty('dsha.identity') ?: 'upstream').toString()
 if (!(releaseIdentityName in releaseIdentityNames))
-    throw new GradleException("UNKNOWN_RELEASE_IDENTITY: dsha.identity 只接受 mod 或 upstream，收到 '${releaseIdentityName}'")
+    throw new GradleException("UNKNOWN_RELEASE_IDENTITY: dsha.identity 只接受 hermes/mod/upstream，收到 '${releaseIdentityName}'")
 def releaseIdentityFile = rootProject.file("ci/release-identity.${releaseIdentityName}.json")
 def releaseIdentity = new groovy.json.JsonSlurper().parse(releaseIdentityFile)
 if (releaseIdentity.schema != 1 || releaseIdentity.identity != releaseIdentityName
