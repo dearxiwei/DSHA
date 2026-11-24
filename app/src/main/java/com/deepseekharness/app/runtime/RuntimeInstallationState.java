@@ -80,16 +80,33 @@ final class RuntimeInstallationState {
   }
 
   public boolean isEnvironmentReady() {
+    boolean layoutOk;
     try {
       var layout =
           new com.deepseekharness.app.backup.UserDataLayout(
               new com.deepseekharness.app.backup.AndroidBackupFileSystem(),
               ctx.getFilesDir().getCanonicalFile());
-      if (!layout.current().isDirectory()) return false;
+      layoutOk = layout.current().isDirectory();
     } catch (IOException unavailable) {
-      return false;
+      layoutOk = false;
     }
-    return isEnvironmentInstalled() && rootfsVersionMatches();
+    boolean extracted = isOfflineExtracted();
+    boolean bash = hasBash();
+    boolean hermes = hermesEntryPresent();
+    boolean dsh =
+        new File(rootfsDir, "usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js").isFile();
+    boolean installed = extracted && bash && (hermes || dsh);
+    boolean version = installed && rootfsVersionMatches();
+    boolean ready = layoutOk && installed && version;
+    if (!ready) {
+      // 就绪判据彼此独立，失败时把每一项都写进诊断，避免只能看到笼统的 READY=false。
+      com.deepseekharness.app.core.DiagnosticLog.record(
+          ctx,
+          "RUNTIME_READY_CHECK",
+          "layout=" + layoutOk + " extracted=" + extracted + " bash=" + bash
+              + " hermes=" + hermes + " dsh=" + dsh + " version=" + version);
+    }
+    return ready;
   }
 
   public boolean isEnvironmentInstalled() {

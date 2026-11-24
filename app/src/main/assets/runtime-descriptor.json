@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "runtimeId": "15b9f7ce0206324cf3b2dd08f814cdb880be67b6eea86159501559742fb9647b",
+  "runtimeId": "84f8abcf8dc34b58e1be1be2a08d10931cc20af3b8fb51c46ddd6e9772449c89",
   "baseVersion": "10",
   "dshVersion": "0.2.2-rc.1",
   "launcherContract": "DSHA_ARM64_V2",
@@ -267,7 +267,7 @@
     "runtime/RuntimeExecution.java": "7c50a9a52f3ec935663dfeda8786d22e1f089b444babb907c380b62f4fc2e3c5",
     "runtime/RuntimeHardlinks.java": "96f4ac6c54a8d8dbf1812fe0da2cc9bbf31793b2440ce3de211f486d9f828202",
     "runtime/RuntimeHostPorts.java": "cad6ea41f8791faf789fdefecfffea370f7b4310c078eff4cdaa7e15e8663245",
-    "runtime/RuntimeInstallationState.java": "d70d3dfb846472df5d69b879bb44986b5834c4aff634a783758d6b93c83e780b",
+    "runtime/RuntimeInstallationState.java": "b2474de3f1e89372d1d34cc7cd7a5b400d0dc30657eaad7e27acb8c85fbbf953",
     "runtime/RuntimeLauncher.java": "7781c85d34560fe9fc5c7f3da1b0a464926f36227a588e306edfd8c1859c2bef",
     "runtime/RuntimeLauncherAssets.java": "e00ec07e55a4632b2adb1d5bc5f9dc5fd08cc90c7ff1cddcba858c54641c69c2",
     "runtime/RuntimeNativeFiles.java": "89d24c96858ec41aec5068c2b6a34365814bdd709649ba349229bf7f9597721a",
