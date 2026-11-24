@@ -103,10 +103,23 @@ public final class WebProcSel {
     if ((executable.equals("bash") || executable.equals("sh")) && argv.length > 1) {
       // The app's pre-exec shell is still a writer/startup owner. Recognize its exact
       // generation+PID+sentinel contract for the barrier, but never signal this shell by name.
-      if (argv.length == 3 && argv[1].equals("-c") && managedWebShell(argv[2])) return true;
+      if (argv.length == 3 && argv[1].equals("-c")
+          && (managedWebShell(argv[2]) || managedHermesShell(argv[2]))) return true;
+      // hermes.sh 只接受「脚本 + dashboard 子命令」这一种形态。
+      if (argv[1].equals(HermesEntrypoint.SCRIPT)
+          && argv.length > 2
+          && argv[2].equals("dashboard")) return true;
       return argv[1].equals("/root/dsh-watchdog.sh")
           || argv[1].equals("/root/dsh-web-restart.sh")
           || argv[1].equals("/root/dsh-cmd.txt");
+    }
+    // Hermes：入口脚本 exec 之后是随包 python，形态固定为 `-m hermes_cli.main dashboard`。
+    // 只认这一条子命令；`python -m http.server` 之类的用户进程一律不放行。
+    if (executable.equals("python3") || executable.equals("python")) {
+      return argv.length >= 4
+          && argv[1].equals("-m")
+          && argv[2].equals("hermes_cli.main")
+          && argv[3].equals("dashboard");
     }
     if (!isNode(argv[0]) || argv.length < 3) return false;
     int entry = argv[1].equals("--expose-internals") ? 2 : 1;
@@ -130,6 +143,18 @@ public final class WebProcSel {
             || command.contains("exec dsh --profile 'dsha-recovery-")
             || command.contains(DshEntrypoint.exec() + " web --no-open --host 127.0.0.1 --port ")
             || command.contains(DshEntrypoint.exec() + " --profile 'dsha-recovery-"));
+  }
+
+  /** Hermes 启动前置：路径、HERMES_HOME、generation、pid、哨兵与 dashboard 子命令都要精确匹配。 */
+  private static boolean managedHermesShell(String command) {
+    return command.startsWith("export PATH=\"" + HermesEntrypoint.NODE_BIN + ":")
+        && command.contains("export HERMES_HOME=" + HermesEntrypoint.HOME + " && ")
+        && command.contains("export HERMES_WEB_DIST=" + HermesEntrypoint.WEB_DIST + " && ")
+        && command.contains("export DSHA_WEB_GENERATION=")
+        && command.contains("echo $$ > " + PID_WEB)
+        && command.contains("[ ! -e " + STOP_SENTINEL + " ] || exit 0;")
+        && command.contains(
+            HermesEntrypoint.exec() + " dashboard --no-open --host 127.0.0.1 --port ");
   }
 
   private static boolean isProrootManagedWebShell(String[] argv) {

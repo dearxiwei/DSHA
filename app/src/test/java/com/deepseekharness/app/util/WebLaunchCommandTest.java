@@ -5,25 +5,36 @@ import org.junit.Test;
 
 public class WebLaunchCommandTest {
   @Test
-  public void capturesGenerationBeforePidSentinelAndExec() {
+  public void runsHermesDashboardWithFixedRuntimePaths() {
     String result = WebLaunchCommand.build(false, "zh", "web", 0, 42);
+    assertTrue(result.startsWith("export PATH=\"" + HermesEntrypoint.NODE_BIN + ":"));
+    assertTrue(result.contains("export HOME=/root && "));
+    assertTrue(result.contains("export HERMES_HOME=" + HermesEntrypoint.HOME + " && "));
+    assertTrue(result.contains("export HERMES_WEB_DIST=" + HermesEntrypoint.WEB_DIST + " && "));
+    assertTrue(
+        result.contains(
+            "export PYTHONPATH=" + HermesEntrypoint.APP + "${PYTHONPATH:+:$PYTHONPATH} && "));
     assertTrue(result.contains("export DSHA_WEB_GENERATION=42"));
-    assertTrue(result.startsWith("export PATH=\"/root/dsh-bin:/usr/local/sbin:/usr/local/bin:"));
-    assertTrue(result.contains("${PATH:+:$PATH}\" && "));
-    assertTrue(result.contains("export DSHA_WORKSPACE_DOCUMENTS=/root/Documents && "));
-    assertTrue(result.indexOf("DSHA_WORKSPACE_DOCUMENTS=") < result.indexOf(DshEntrypoint.exec()));
-    assertTrue(result.endsWith(DshEntrypoint.exec() + " web --no-open --host 127.0.0.1 --port 0"));
+    assertTrue(
+        result.endsWith(
+            HermesEntrypoint.exec() + " dashboard --no-open --host 127.0.0.1 --port 0"));
     assertTrue(result.indexOf("echo $$ >") < result.indexOf("[ ! -e"));
-    assertTrue(result.indexOf("[ ! -e") < result.indexOf(DshEntrypoint.exec()));
+    assertTrue(result.indexOf("[ ! -e") < result.indexOf(HermesEntrypoint.exec()));
+    // 旧 dsh 注入必须彻底消失：否则会把 dsh 专属观察器塞进 Hermes 进程。
+    assertFalse(result.contains("NODE_OPTIONS"));
+    assertFalse(result.contains("startup-observer"));
+    assertFalse(result.contains("DSH_HOME"));
+    assertFalse(result.contains("dsh-bin"));
     assertFalse(result.contains("API_KEY"));
-    assertTrue(result.contains("${NODE_OPTIONS-}"));
   }
 
   @Test
-  public void profileAndSettingsRemainQuoted() {
-    String result = WebLaunchCommand.build(true, "en", "recovery'; echo injected", 3080, 1);
-    assertTrue(result.contains("export DSH_CONFIRM=1"));
-    assertTrue(result.contains("--profile " + ShellQuote.arg("recovery'; echo injected")));
+  public void keepsIdentityAndQuotesProfile() {
+    String result = WebLaunchCommand.build(true, "en", "worker'; echo injected", 9119, 1);
+    assertTrue(
+        result.contains(
+            "export DSHA_STARTUP_PROFILE=" + ShellQuote.arg("worker'; echo injected")));
+    assertTrue(result.endsWith("--port 9119"));
     assertThrows(
         IllegalArgumentException.class, () -> WebLaunchCommand.build(true, "en", "web", -1, 1));
     assertThrows(
