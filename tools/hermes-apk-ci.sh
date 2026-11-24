@@ -326,17 +326,49 @@ cmd_evidence() {
 
 # ---------------------------------------------------------------- build
 
+# 托管 runner 的出口 IP 会被 Maven Central 限流（实测 429 Too Many Requests），
+# 而 settings.gradle 用 FAIL_ON_PROJECT_REPOS，所以只能改 settings 级仓库：
+# 把 repo.maven.apache.org 换成 Google 的 Central 镜像，保留 google()/jitpack 等既有仓库。
+maven_init_script() {  # $1=输出路径
+    cat > "$1" <<'GROOVY'
+def mirror = System.getenv('HERMES_MAVEN_MIRROR') ?: 'https://maven-central.storage-download.googleapis.com/maven2/'
+settingsEvaluated { settings ->
+    def retarget = { handler ->
+        def central = handler.findAll { repo ->
+            repo instanceof org.gradle.api.artifacts.repositories.MavenArtifactRepository &&
+                (repo.url.toString().contains('repo.maven.apache.org') ||
+                 repo.url.toString().contains('repo1.maven.org'))
+        }
+        central.each { handler.remove(it) }
+        handler.maven { url = mirror }
+    }
+    retarget(settings.pluginManagement.repositories)
+    retarget(settings.dependencyResolutionManagement.repositories)
+}
+allprojects {
+    buildscript.repositories.all { repo ->
+        if (repo instanceof org.gradle.api.artifacts.repositories.MavenArtifactRepository &&
+            repo.url.toString().contains('repo.maven.apache.org')) {
+            repo.url = mirror
+        }
+    }
+}
+GROOVY
+}
+
 cmd_build() {
-    local task status log_file status_file
+    local task status log_file status_file init
     task="${1:-${HERMES_TASK:-:app:assembleStandardDebug}}"
     [ -n "$task" ] || task=:app:assembleStandardDebug
     log_file="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/hermes-apk-build.log"
     status_file="$log_file.status"
-    log "构建 $task（完整日志 $log_file）"
+    init="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/hermes-maven-mirror.gradle"
+    maven_init_script "$init"
+    log "构建 $task（Maven 走镜像，完整日志 $log_file）"
     # 同时「流式输出到 CI 日志」和「保留真实退出码」：POSIX sh 没有 pipefail，
     # 所以让写日志的管道里先记下 build.sh 的状态码，再从文件读回来。
-    { bash build.sh "$task" 2>&1; printf '%s\n' "$?" > "$status_file"; } | tee "$log_file"
-    status=$(cat "$status_file")
+    { bash build.sh -I "$init" "$task" 2>&1; printf '%s\n' "$?" > "$status_file"; } | tee "$log_file"
+    status=$(cat "$status_file" 2>/dev/null || echo 1)
     if [ "$status" -ne 0 ]; then
         printf '::error::构建失败（退出码 %s），日志尾部：\n' "$status" >&2
         tail -n 60 "$log_file" >&2 || true
