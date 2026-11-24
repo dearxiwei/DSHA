@@ -18,8 +18,13 @@ public final class Constants {
   public static final String SITE_URL = "https://" + SITE_HOST + "/";
 
   // ================= 端口契约（框架不变式，见 AGENTS.md） =================
-  /** WebUI 默认端口 */
-  public static final int DSH_WEB_PORT = 3080;
+  /**
+   * WebUI 默认端口。
+   *
+   * <p>Hermes dashboard 的惯例端口是 9119；旧 dsh 用 3080。用户显式保存过端口时以保存值为准，
+   * 这里只决定首次启动与「端口非法」时的回落值。
+   */
+  public static final int DSH_WEB_PORT = 9119;
 
   /** App 能力桥（agent 调 Android）端口 */
   public static final int SHELL_BRIDGE_PORT = 3090;
