@@ -39,7 +39,10 @@ final class PreviewAuth {
               try {
                 if (url.isEmpty())
                   error = com.deepseekharness.app.util.UiText.text("Web 未就绪，请回启动页");
-                else {
+                else if (!url.contains("token=")) {
+                  // Hermes 只监听 127.0.0.1，没有鉴权门：直接加载 loopback 地址，不换 cookie。
+                  cookie = null;
+                } else {
                   cookie = controller.exchangeDshAuthCookie();
                   if (cookie == null) error = controller.getWebAuthFailure();
                 }

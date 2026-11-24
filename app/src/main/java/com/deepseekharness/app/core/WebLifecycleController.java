@@ -1227,6 +1227,13 @@ final class WebLifecycleController {
               "dsh-drain");
       drainer.setDaemon(true);
       drainer.start();
+      // Hermes 在 loopback 上没有鉴权门：并发轮询 /api/status，2xx 即就绪。
+      Thread readiness =
+          new Thread(
+              () -> watchHermesReadiness(run, generation, onStatus, ports, safeMode),
+              "hermes-ready");
+      readiness.setDaemon(true);
+      readiness.start();
       // 启动慢只提示；保持启动状态，看门狗不会因此重启，用户仍可随时手动停止。
       io.schedule(() -> reportSlowStart(generation, onStatus), 60, TimeUnit.SECONDS);
       draining = true;
@@ -1262,6 +1269,88 @@ final class WebLifecycleController {
       reportStatus(generation, onStatus, failure);
     } finally {
       if (!draining) lifecycle.finishStart(generation);
+    }
+  }
+
+  /**
+   * 就绪收尾：旧链（stdout 抓到鉴权 URL）与 Hermes 新链（{@code /api/status} 2xx）共用同一套状态推进。
+   *
+   * <p>两条链都可能先到，靠 {@code run.authUrl} 是否为空做幂等判据，重复调用直接返回。
+   */
+  private void finishWebReady(
+      WebRun run,
+      long generation,
+      Consumer<String> onStatus,
+      com.deepseekharness.app.util.WebPortPolicy.Choice ports,
+      boolean safeMode,
+      String url) {
+    synchronized (lifecycle) {
+      if (!lifecycle.isCurrent(generation) || !run.authUrl.isEmpty()) return;
+      if (state.recovery.failed(generation)
+          || state.diagnostics.hasExplicitStartupFailure(generation)) return;
+      if (!publishAuthenticatedRun(lifecycle, run, url)) return;
+      state.diagnostics.backendReady(generation);
+      if (ports.preferred == 0 || ports.fallback()) {
+        config.rememberFallbackWebPort(ports.preferred, run.port);
+        reportStatus(
+            generation,
+            onStatus,
+            com.deepseekharness.app.util.UiText.format("实际 Web 端口：%s", run.port));
+      }
+      webProc.recordIdentity();
+      setWebStage(generation, com.deepseekharness.app.util.UiText.text("服务已就绪，等待进入网页"));
+      lifecycle.finishStart(generation);
+      reportStatus(
+          generation,
+          onStatus,
+          com.deepseekharness.app.util.UiText.text("服务已就绪，点「进入对话」即可进入"));
+    }
+    notifyReadyWebPageChanged();
+    io.execute(() -> saveRunningSession(run));
+    // LAN 交换与迁移探针不能卡住 stdout 消费，所以另起线程。
+    Thread ready =
+        new Thread(() -> afterAuthenticated(generation, onStatus, safeMode), "dsha-web-ready");
+    ready.setDaemon(true);
+    ready.start();
+  }
+
+  /**
+   * Hermes 就绪探测。
+   *
+   * <p>Hermes 只监听 127.0.0.1 时没有鉴权门，不需要从日志里抓 token；端口由 App 自己选定，所以
+   * {@code GET /api/status} 返回 2xx 即可进入页面。探测失败不设强杀时限，与旧的等待策略一致：
+   * 慢启动只提示，用户仍可手动停止。
+   */
+  private void watchHermesReadiness(
+      WebRun run,
+      long generation,
+      Consumer<String> onStatus,
+      com.deepseekharness.app.util.WebPortPolicy.Choice ports,
+      boolean safeMode) {
+    if (ports.listen <= 0) return; // 端口未知时仍走旧链的日志解析
+    com.deepseekharness.app.util.HermesReadiness.Probe probe =
+        com.deepseekharness.app.util.HermesReadiness.httpProbe(1000, 1500);
+    String url = "http://127.0.0.1:" + ports.listen;
+    while (lifecycle.isCurrent(generation)) {
+      boolean stop;
+      synchronized (lifecycle) {
+        stop =
+            !run.authUrl.isEmpty()
+                || run.launcher == null
+                || state.recovery.failed(generation)
+                || state.diagnostics.hasExplicitStartupFailure(generation);
+      }
+      if (stop) return;
+      if (com.deepseekharness.app.util.HermesReadiness.ready(probe, ports.listen)) {
+        finishWebReady(run, generation, onStatus, ports, safeMode, url);
+        return;
+      }
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        return;
+      }
     }
   }
 
@@ -1303,36 +1392,8 @@ final class WebLifecycleController {
               }
 
               public void authentication(String url) {
-                synchronized (lifecycle) {
-                  if (!current() || authenticated()) return;
-                  if (!state.recovery.failed(generation)) {
-                    if (!publishAuthenticatedRun(lifecycle, run, url)) return;
-                    state.diagnostics.backendReady(generation);
-                    if (ports.preferred == 0 || ports.fallback()) {
-                      config.rememberFallbackWebPort(ports.preferred, run.port);
-                      reportStatus(
-                          generation,
-                          onStatus,
-                          com.deepseekharness.app.util.UiText.format("实际 Web 端口：%s", run.port));
-                    }
-                    webProc.recordIdentity();
-                    setWebStage(
-                        generation, com.deepseekharness.app.util.UiText.text("服务已就绪，等待进入网页"));
-                    lifecycle.finishStart(generation);
-                    reportStatus(
-                        generation,
-                        onStatus,
-                        com.deepseekharness.app.util.UiText.text("鉴权链接已就绪，点「进入对话」即可进入 dsh"));
-                  }
-                }
-                notifyReadyWebPageChanged();
-                io.execute(() -> saveRunningSession(run));
-                // LAN exchanges and migration checks never pause the stdout drain.
-                Thread ready =
-                    new Thread(
-                        () -> afterAuthenticated(generation, onStatus, safeMode), "dsha-web-ready");
-                ready.setDaemon(true);
-                ready.start();
+                // 旧链：从 dsh 日志里抓到鉴权链接。Hermes 不走这条（见 watchHermesReadiness）。
+                finishWebReady(run, generation, onStatus, ports, safeMode, url);
               }
 
               public void readFailure(IOException error) {
