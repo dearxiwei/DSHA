@@ -892,7 +892,12 @@ final class RuntimeTools {
     String target = "../../usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules";
     if (!fs.stat(new File(root, "usr/local/lib/node_modules/@deepseek-ai/dsh/node_modules"))
         .type
-        .equals("DIRECTORY")) throw new IOException("BUNDLED_MODULES_MISSING");
+        .equals("DIRECTORY")) {
+      // 纯 Hermes 运行树没有 dsh 的 node_modules；内置插件依赖是 dsh 专属，
+      // 此时直接跳过，而不是让整次解压失败（过渡期两种运行树二选一）。
+      if (new File(root, "opt/hermes/hermes.sh").isFile()) return;
+      throw new IOException("BUNDLED_MODULES_MISSING");
+    }
     var names =
         new java.util.ArrayList<>(com.deepseekharness.app.util.BuiltinPlugins.DEFAULT_BUILTINS);
     names.add("dsh-app-integration");
