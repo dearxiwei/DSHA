@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "runtimeId": "ace079db5b1347dc41c111579a5fa7bc1e287b595ad3357c2d07538d9a6b69a3",
+  "runtimeId": "15b9f7ce0206324cf3b2dd08f814cdb880be67b6eea86159501559742fb9647b",
   "baseVersion": "10",
   "dshVersion": "0.2.2-rc.1",
   "launcherContract": "DSHA_ARM64_V2",
@@ -372,7 +372,7 @@
     "util/ManagedInstallPath.java": "f9131eddf382df6d9d8499eb0913ebf1b167e9e8a4c0adfbf38a03d3ed08b677",
     "util/ManagedPatchChain.java": "7c02f2a41ae4444e50e413d32325abc08a6782ec7510b2dffbc378f3902c5304",
     "util/ManagedRuntimeLayout.java": "f16dcb8aec900de8c933e2bac9ff2c8b969be31649bfa379ef37bca4a41cdc0c",
-    "util/ManagedRuntimePaths.java": "a9bc2180c3412011dd7750c03756ba3cd9cffc7b97be0a424b2f7dc42a9600f9",
+    "util/ManagedRuntimePaths.java": "f724f67edb5f654dc1111615d7b3fdbd1c48cd39d800a51671d148634db2f109",
     "util/NativeConsentPolicy.java": "fb413cf26e596836259f3dcc924da0ec6f98047d7594549ade726133f0062493",
     "util/NativeConsentProjection.java": "5226acf04a0cd20668c7f42a3276593b209542bff7ba42a01b4f71d31f083467",
     "util/NotificationIds.java": "3c219a5d0301119dd31272d90fde3bb6aafeb58a325c5e95fce1b6591f236118",

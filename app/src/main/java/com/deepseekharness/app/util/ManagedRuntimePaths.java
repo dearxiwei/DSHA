@@ -34,7 +34,13 @@ public final class ManagedRuntimePaths {
   public static List<String> enumerate(File listedRoot, File currentRoot, View view)
       throws IOException {
     List<String> paths = new ArrayList<>();
-    for (String path : ManagedRuntimeLayout.paths()) paths.add(ManagedRuntimeLayout.ROOT + path);
+    // 只收集真实存在的受管路径：Hermes 运行树没有 dsh 的 root/.dsh、dsh-bin 等目录，
+    // 无条件列举会让后续 child() 在缺失父目录上抛 PARENT_LINK_OR_MISSING。
+    for (String path : ManagedRuntimeLayout.paths()) {
+      java.io.File candidate = new java.io.File(listedRoot, ManagedRuntimeLayout.ROOT + path);
+      if (view.exists(candidate) || view.symbolic(candidate))
+        paths.add(ManagedRuntimeLayout.ROOT + path);
+    }
     File global = new File(listedRoot, "usr/local/lib/node_modules");
     // Hermes 运行树没有 node_modules；缺失时只代表没有包别名，不是环境不可读。
     File[] packages = view.list(global);
