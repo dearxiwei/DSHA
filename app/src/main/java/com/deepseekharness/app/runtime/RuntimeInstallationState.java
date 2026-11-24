@@ -95,7 +95,16 @@ final class RuntimeInstallationState {
   public boolean isEnvironmentInstalled() {
     return isOfflineExtracted()
         && hasBash()
-        && new File(rootfsDir, "usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js").isFile();
+        && (hermesEntryPresent()
+            || new File(rootfsDir, "usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js")
+                .isFile());
+  }
+
+  /** Hermes 运行树（离线覆盖层）是否就位；过渡期与 dsh 二选一即可。 */
+  private boolean hermesEntryPresent() {
+    return new File(rootfsDir, "opt/hermes/hermes.sh").isFile()
+        && new File(rootfsDir, "opt/hermes/python/bin/python3").isFile()
+        && new File(rootfsDir, "opt/hermes/app/hermes_cli/main.py").isFile();
   }
 
   public com.deepseekharness.app.backup.RuntimeDescriptor expectedRuntimeDescriptor()

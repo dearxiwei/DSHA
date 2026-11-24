@@ -39,6 +39,13 @@ public final class InstallProbe {
     }
   }
 
+  /**
+   * 只有 Hermes 树、没有 dsh 时，dsh 专属补丁检查没有意义：直接成功。
+   * 过渡期两个运行时共存时仍按原规则检查 dsh。
+   */
+  private static final String HERMES_ONLY_GUARD =
+      "[ -f /opt/hermes/hermes.sh ] && [ ! -f /usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js ] && exit 0; ";
+
   public static List<Check> checks(int selected) {
     List<Check> all = new ArrayList<>();
     all.add(new Check(TOOLS_ID, "curl", "curl", "curl --version"));
@@ -54,11 +61,16 @@ public final class InstallProbe {
     all.add(
         new Check(
             DSH_ID,
-            "dsh",
-            com.deepseekharness.app.util.UiText.text("dsh 入口与版本"),
-            "test -x /usr/local/bin/dsh && node -e "
+            "hermes",
+            com.deepseekharness.app.util.UiText.text("Hermes 运行时入口与版本"),
+            // 过渡期：有 Hermes 树就验 Hermes，否则回落到旧的 dsh 检查。
+            "if [ -x /opt/hermes/hermes.sh ]; then "
+                + "test -x /opt/hermes/python/bin/python3 && test -f /opt/hermes/app/hermes_cli/main.py "
+                + "&& test -f /opt/hermes/web_dist/index.html && cat /opt/hermes/version; else "
+                + "test -x /usr/local/bin/dsh && node -e "
                 + ShellQuote.arg(
-                    "const p=require('/usr/local/lib/node_modules/@deepseek-ai/dsh/package.json'); if(!/^\\d+\\./.test(p.version))process.exit(1); console.log(p.version)")));
+                    "const p=require('/usr/local/lib/node_modules/@deepseek-ai/dsh/package.json'); if(!/^\\d+\\./.test(p.version))process.exit(1); console.log(p.version)")
+                + "; fi"));
     all.add(
         new Check(
             PATCHES_ID,
@@ -70,7 +82,8 @@ public final class InstallProbe {
             PATCHES_ID,
             "session",
             com.deepseekharness.app.util.UiText.text("会话写入补丁"),
-            "found=0; for f in "
+            HERMES_ONLY_GUARD
+                + "found=0; for f in "
                 + ShellQuote.arg(SESSION_TOP)
                 + " "
                 + ShellQuote.arg(SESSION_NESTED)
@@ -84,7 +97,8 @@ public final class InstallProbe {
             PATCHES_ID,
             "settings",
             com.deepseekharness.app.util.UiText.text("局域网设置补丁"),
-            "test -f "
+            HERMES_ONLY_GUARD
+                + "test -f "
                 + ShellQuote.arg(SETTINGS)
                 + " || { echo '设置模块缺失'; exit 1; }; if grep -Fq "
                 + ShellQuote.arg(
