@@ -63,6 +63,8 @@ public final class RuntimeTrial {
     for (byte value : nonce) hex.append(String.format(java.util.Locale.ROOT, "%02x", value));
     proof.put("nonce", hex.toString());
     proof.put("confirmedAt", System.currentTimeMillis());
+    // 冷运行时确认要求回执里的 runtimeMode 与实际所选运行时一致。
+    proof.put("runtimeMode", proot.runtime().id());
     proof.put("trialMode", "hermes-skip");
     proof.put("assets", true);
     proof.put("dataRead", true);
