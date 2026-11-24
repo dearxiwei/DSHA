@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "runtimeId": "5428d003306a9126aef29139bf6660cd012d54a2b1532a2e50949f352b57b250",
+  "runtimeId": "6e7985b0555bce4977879f0a269461d1232a9c7f59616e5a78243a521a24ee48",
   "baseVersion": "10",
   "dshVersion": "0.2.2-rc.1",
   "launcherContract": "DSHA_ARM64_V2",
@@ -154,7 +154,7 @@
     "core/StartupPreparationTiming.java": "84be7611ce3713976ecdded15c3b9eaf948133e357f90fb98bf5e09828f2e4e8",
     "core/TerminalRuntimeProtection.java": "d59591d938e81ea3f75a125f5491621e076fe889b9d3b18ca2db14facf34aa12",
     "core/TerminalSessionOwner.java": "a4e0a7dbb63dec38b82524a958002ab694b2378d1d0d912b05738a9bf58ffa17",
-    "core/WebLifecycleController.java": "0d03c9b135c7d995fe14d37683fafc3a1a14e8531931839786ea9a995783e7d4",
+    "core/WebLifecycleController.java": "50b038e4f2f353eb84771d49691c17f7666bca1826795e8443bc99d7159e1656",
     "core/WebOutputSession.java": "e4331618e02ed3773ec2c2e17f6ec452743990518fbcdb0bc426b356919e8b37",
     "core/WebProcessSession.java": "62c8bcde7615d8dc5c755a819ebb28e77a85ab3b86c2b2ae02943c74372b3f16",
     "core/WebReadyTasks.java": "3010c17320d375cd78db5f27d09dee863e03da3d960a39aac018b7ed8165b493",
