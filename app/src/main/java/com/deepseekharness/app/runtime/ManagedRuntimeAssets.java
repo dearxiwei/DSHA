@@ -166,6 +166,12 @@ final class ManagedRuntimeAssets {
             assetText.read("runtime-descriptor.json"));
     for (ManagedRuntimePaths.Marker marker : ManagedRuntimePaths.Marker.values())
       writeMarker(context, new File(stage, marker.relative), values.get(marker));
+    // 与冷装一致：guest 数据根必须存在，否则 UserDataLayout 就绪检查不通过。
+    for (String relative : new String[] {"root/.dsh", "root/.hermes"}) {
+      File dir = new File(root, relative);
+      if (!dir.isDirectory() && !dir.mkdirs())
+        throw new IOException("GUEST_DATA_ROOT_UNAVAILABLE:" + relative);
+    }
     return paths;
   }
 

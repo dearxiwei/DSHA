@@ -173,6 +173,21 @@ public class ProotBootstrap {
     return installation.stageManagedRuntime(stage, progress);
   }
 
+  /**
+   * 建立 guest 侧数据根目录。
+   *
+   * <p>UserDataLayout 的就绪检查要求 {@code /root/.dsh} 存在；全新安装时该目录原本由 dsh 的
+   * 工具脚本顺带创建。Hermes 走同一套布局检查，因此安装阶段必须显式建立它，
+   * 同时建立 Hermes 自己的 {@code /root/.hermes}。
+   */
+  public void ensureGuestDataRoots() throws IOException {
+    for (String relative : new String[] {"root/.dsh", "root/.hermes"}) {
+      java.io.File dir = new java.io.File(rootfsDir, relative);
+      if (!dir.isDirectory() && !dir.mkdirs())
+        throw new IOException("GUEST_DATA_ROOT_UNAVAILABLE:" + relative);
+    }
+  }
+
   public void markOfflineExtracted() throws IOException {
     installation.markOfflineExtracted();
   }

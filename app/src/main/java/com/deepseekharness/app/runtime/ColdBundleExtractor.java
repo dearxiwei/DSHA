@@ -141,6 +141,8 @@ final class ColdBundleExtractor {
           onProgress, com.deepseekharness.app.util.UiText.text("安装离线 curl、git 与证书"));
       ProotBootstrap.ColdRuntimeSelection installedRuntime =
           boot.installBundledUbuntuTools(onProgress);
+      // 就绪检查要求 guest 数据根已存在（原本由 dsh 工具脚本顺带创建）。
+      boot.ensureGuestDataRoots();
       if (boot.coldCandidate == null)
         com.deepseekharness.app.util.ColdInstallPlan.publishReady(
             () ->
