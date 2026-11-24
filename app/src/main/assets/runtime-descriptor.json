@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "runtimeId": "f0d3f6c8a1daca41e3705a43324a4296cc9cf31436548d8013b2b86198e350ad",
+  "runtimeId": "a934bc2a168aebfee706e3115020dc3fb8ce391a16a02d4ad68eac7620fd0a83",
   "baseVersion": "10",
   "dshVersion": "0.2.2-rc.1",
   "launcherContract": "DSHA_ARM64_V2",
@@ -199,7 +199,7 @@
     "generator:tools/prepare-mobile-plugin.py": "93ca45c695241d5aa8f716db2d95f885ea674dd37d976f95fbda3e41d966b123",
     "generator:tools/prepare-plugin-pnpm-argv-patch.py": "21319bb25f453ecb0138b8c8bd287890642a935d8c3e6beca83e0f7b39da5ffa",
     "generator:tools/prepare-runtime-tools.py": "bb0852b1315d90bdae719dd049329c7213684a0d4e57fffd1d72d1d8b157c223",
-    "generator:tools/prepare-standard-assets.py": "35e3c8143bbc73b808837654ccf3939b3320eedd3b1c5660080dc9aabec50575",
+    "generator:tools/prepare-standard-assets.py": "741c12f5a77ed965dc135c69f2b4a01e5fd483d33f5b612dc0c6190395db73df",
     "generator:tools/prepare-web-languages.py": "df1a8148af9900f246a5ac9c20585463c8bd1e6f1fd6fa9b0468b74500c74380",
     "generator:tools/prepare-web-search-headers-patch.py": "7d0687035d44e4b40356460901937acc9a9f40b61b34dd8f9496ad1f0109d330",
     "generator:tools/prepare-welcome-notice-patch.py": "bf55798b52ea203c240798afdccb581e22937e645e652eec4ab4734ed65521a7",

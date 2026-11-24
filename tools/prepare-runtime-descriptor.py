@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 import re
 import sys
-from runtime_input_contract import load, asset_paths, launcher_paths, relative, hermes_section
+from runtime_input_contract import load, asset_paths, launcher_paths, relative
+from hermes_runtime_lock import hermes_section
 
 ROOT = Path(__file__).resolve().parents[1]
 

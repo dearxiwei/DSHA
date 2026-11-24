@@ -14,7 +14,7 @@ import tarfile
 import importlib.util
 from generated_asset_directory import prune as prune_generated
 from asset_deployment import load_manifest, selected_assets, verify_reader_contracts, MANIFEST as DEPLOYMENT_MANIFEST
-from runtime_input_contract import hermes_lock, HERMES_ASSET, HERMES_META_ASSET
+from hermes_runtime_lock import hermes_lock, HERMES_ASSET, HERMES_META_ASSET
 
 GH_CLI_LOCK = Path(__file__).with_name('gh-cli') / 'packages.lock.json'
 REPO = Path(__file__).resolve().parents[1]
