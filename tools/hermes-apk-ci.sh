@@ -333,24 +333,23 @@ maven_init_script() {  # $1=输出路径
     cat > "$1" <<'GROOVY'
 def mirror = System.getenv('HERMES_MAVEN_MIRROR') ?: 'https://maven-central.storage-download.googleapis.com/maven2/'
 settingsEvaluated { settings ->
-    def retarget = { handler ->
-        def central = handler.findAll { repo ->
-            repo instanceof org.gradle.api.artifacts.repositories.MavenArtifactRepository &&
-                (repo.url.toString().contains('repo.maven.apache.org') ||
-                 repo.url.toString().contains('repo1.maven.org'))
-        }
-        central.each { handler.remove(it) }
-        handler.maven { url = mirror }
-    }
-    retarget(settings.pluginManagement.repositories)
-    retarget(settings.dependencyResolutionManagement.repositories)
-}
-allprojects {
-    buildscript.repositories.all { repo ->
-        if (repo instanceof org.gradle.api.artifacts.repositories.MavenArtifactRepository &&
-            repo.url.toString().contains('repo.maven.apache.org')) {
-            repo.url = mirror
-        }
+    // plugin 顺序必须是「镜像 → google → 插件门户」：门户会把请求转到
+    // repo.maven.apache.org，被限流返回 429，放在最后才不会被优先命中。
+    def pm = settings.pluginManagement.repositories
+    pm.clear()
+    pm.maven { url = mirror }
+    pm.google()
+    pm.gradlePluginPortal()
+
+    // 依赖仓库与 settings.gradle 声明保持一致，只把 Central 换成镜像。
+    def dr = settings.dependencyResolutionManagement.repositories
+    dr.clear()
+    dr.maven { url = mirror }
+    dr.google()
+    dr.maven { url = 'https://jitpack.io' }
+    dr.maven {
+        url = 'https://maven.mozilla.org/maven2/'
+        content { includeGroupByRegex 'org\\.mozilla.*' }
     }
 }
 GROOVY
